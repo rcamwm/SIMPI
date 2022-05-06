@@ -1,0 +1,10 @@
+.vscode
+.idea
+.DS_Store
+*.o
+.gdbinit
+# object files
+mpi
+user
+Simpi
+Matrix
