@@ -5,6 +5,7 @@
 #include "Matrix.h"
 #define MATRIX_DIMENSION_X 5
 #define MATRIX_DIMENSION_Y 5
+using namespace SimpiNS;
 
 int processID;
 
@@ -20,7 +21,7 @@ void testSolveSystemInverse(Simpi *mainSimpi); // must be 3x3
 */
 void userDefinedActivity(Simpi *mainSimpi) 
 {
-    // testInverse(mainSimpi);
+    testInverse(mainSimpi);
     testSolveSystemJacobi(mainSimpi);
     // testSolveSystemInverse(mainSimpi);
 }
@@ -28,8 +29,8 @@ void userDefinedActivity(Simpi *mainSimpi)
 void testSolveSystemJacobi(Simpi *mainSimpi)
 {
     Matrix A(MATRIX_DIMENSION_X, MATRIX_DIMENSION_Y);
-    Matrix::Vector B(MATRIX_DIMENSION_Y);
-    Matrix::Vector C(MATRIX_DIMENSION_Y);
+    Vector B(MATRIX_DIMENSION_Y);
+    Vector C(MATRIX_DIMENSION_Y);
 
     mainSimpi->synch();
     
@@ -62,8 +63,8 @@ void testSolveSystemJacobi(Simpi *mainSimpi)
 void testSolveSystemInverse(Simpi *mainSimpi)
 {
     Matrix A(MATRIX_DIMENSION_X, MATRIX_DIMENSION_Y);
-    Matrix::Vector B(3);
-    Matrix::Vector C(3);
+    Vector B(3);
+    Vector C(3);
 
     mainSimpi->synch();
     
@@ -131,7 +132,7 @@ int main(int argc, char* argv[])
     processID = atoi(argv[1]); // Global
     Simpi *mainSimpi = new Simpi(processID, atoi(argv[2])); // argv[2]: # of processes being used
     Matrix::setSimpi(mainSimpi);
-    //Vector::setSimpi(mainSimpi);
+    Vector::setSimpi(mainSimpi);
     userDefinedActivity(mainSimpi);
 }
 

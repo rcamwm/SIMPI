@@ -14,51 +14,53 @@
 #include <string>
 #include <vector>
 
-#define SYNCH_OBJECT_MEM_NAME "/simpi_shared_mem"
-#define UNIQUE_ID_SIZE 23
-
-typedef struct MatrixMetadata 
+namespace SimpiNS
 {
-    char uniqueID[UNIQUE_ID_SIZE];
-    int fileDescriptor;
-    size_t size;
-    double* matrixData;
-} MatrixMetadata;
+    #define SYNCH_OBJECT_MEM_NAME "/simpi_shared_mem"
+    #define UNIQUE_ID_SIZE 23
 
-typedef struct SynchObject 
-{
-    int processCount;
-    char lastMatrixID[UNIQUE_ID_SIZE];
-    int ready[];
-} SynchObject;
+    typedef struct MatrixMetadata 
+    {
+        char uniqueID[UNIQUE_ID_SIZE];
+        int fileDescriptor;
+        size_t size;
+        double* matrixData;
+    } MatrixMetadata;
 
-class Simpi 
-{
-    public:
-        Simpi(int _id, int _processCount);
-        ~Simpi();
-        int getID() { return id; }
-        int getProcessCount() { return processCount; }
-        SynchObject* getSynchInfo() { return synchInfo; }
-
-        std::pair<std::string, double*> createMatrix(int x, int y);
-
-        void freeMatrix(std::string uniqueID);
-        void synch();
-        void synchExtraCycles(int cycles);
-
-    private:
-        int id;
+    typedef struct SynchObject 
+    {
         int processCount;
-        int shm_fd;
-        SynchObject* synchInfo;
-        std::map<std::string, MatrixMetadata> matrixInfo;
-        std::string getSharedMemoryName();
+        char lastMatrixID[UNIQUE_ID_SIZE];
+        int ready[];
+    } SynchObject;
 
-        double *initializeMatrixMemory_LeaderThread(int &fd, const std::string &uniqueID, int size);
-        double *initializeMatrixMemory_FollowerThread(int &fd, const std::string &uniqueID, int size);
-        void createMatrixMetadata(int size, int fd, std::string uniqueID, double *matrix);
+    class Simpi 
+    {
+        public:
+            Simpi(int _id, int _processCount);
+            ~Simpi();
+            int getID() { return id; }
+            int getProcessCount() { return processCount; }
+            SynchObject* getSynchInfo() { return synchInfo; }
 
-};
+            std::pair<std::string, double*> createMatrix(int x, int y);
 
+            void freeMatrix(std::string uniqueID);
+            void synch();
+            void synchExtraCycles(int cycles);
+
+        private:
+            int id;
+            int processCount;
+            int shm_fd;
+            SynchObject* synchInfo;
+            std::map<std::string, MatrixMetadata> matrixInfo;
+            std::string getSharedMemoryName();
+
+            double *initializeMatrixMemory_LeaderThread(int &fd, const std::string &uniqueID, int size);
+            double *initializeMatrixMemory_FollowerThread(int &fd, const std::string &uniqueID, int size);
+            void createMatrixMetadata(int size, int fd, std::string uniqueID, double *matrix);
+
+    };
+}
 #endif

@@ -2,74 +2,77 @@
 #define MATRIX_H
 
 #include "Simpi.h"
+//#include "Vector.h"
 
-class Matrix
+namespace SimpiNS
 {
-    private:
-        int xdim, ydim;
-        double* arr;
-        std::string uniqueID;
-        static Simpi* mainSimpi;
+    class Vector
+    {
+        private:
+            int dim;
+            double* arr;
+            //Simpi* mysimpi = NULL;  // for later reference
+            std::string uniqueID;
+            static Simpi *mainSimpi;
+            
+        public:
+            static void setSimpi(Simpi *s) { mainSimpi = s; }
+            Vector(int a);
+            ~Vector();
 
-    public:
-        class Vector;
-        static void setSimpi(Simpi *s) { mainSimpi = s; }
+            int getSimpiID() const { return mainSimpi->getID(); }
+            int getSize() const { return dim; }
+            double& getRef(int pos) { return arr[pos]; }
+            double getVal(int pos) const { return arr[pos]; }
+            void set(int pos, double val) { arr[pos] = val; }
+            
+            friend std::ostream& operator<<(std::ostream& out, const Vector& v);     
+    };
 
-        Matrix(int x, int y);
-        ~Matrix();
+    class Matrix
+    {
+        private:
+            int xdim, ydim;
+            double* arr;
+            std::string uniqueID;
+            static Simpi* mainSimpi;
 
-        int getSimpiID() const { return mainSimpi->getID(); }
-        int getX() { return xdim; }
-        int getY() { return ydim; }
-        double& get(int x, int y) { return arr[x + y * xdim]; }
-        double getAlgbera(int pos) { return arr[pos]; }
-        void set(int pos, int val) { arr[pos] = val; }
+            // jacobi() helper functions
+            void jacobiSaveInputs(int start, int end, Matrix* saveEq, Vector* constants, Vector* saveConst);
+            void jacobiSwitchAndDivide(int start, int end, Vector* constants, Vector* solution, Vector *prev, int synchOffset);
+            void jacobiFirstIteration(int start, int end, Vector* solution, Vector *prev, int synchOffset);
+            void jacobiRemainingIterations(int start, int end, Vector* solution, Vector *prev, int synchOffset);
+            void jacobiRestoreInputs(int start, int end, Matrix* saveEq, Vector* constants, Vector* saveConst);
 
-        int determinant(double* A, int n, int order);
-        void adjoint(double* A, double* adj, int order, int processID, int processCount);
-        void getCofactor(double* A, double* temp, int p, int q, int n, int order);
-        
-        void inverse(Matrix* inverse);
-        void luDecomposition(Matrix* lower, Matrix* upper);
-        void backwardSubstitution(float* b, float* x);
-        void forwardSubstitution(float *b, float* x); 
+        public:
+            static void setSimpi(Simpi *s) { mainSimpi = s; }
 
-        void solveSystem(Matrix::Vector* constants, Matrix::Vector* solution);
-        void jacobi(Matrix::Vector* constants, Matrix::Vector* solution);
-        void failSafe(Matrix::Vector* constants, Matrix::Vector* solution);
-        bool isDiagonallyDominant();
+            Matrix(int x, int y);
+            ~Matrix();
 
-        friend std::ostream& operator<<(std::ostream& out, const Matrix& m);      
-        // overload +, -, *, /, ..... 
+            int getSimpiID() const { return mainSimpi->getID(); }
+            int getX() { return xdim; }
+            int getY() { return ydim; }
+            double& get(int x, int y) { return arr[x + y * xdim]; }
+            double getAlgbera(int pos) { return arr[pos]; }
+            void set(int pos, int val) { arr[pos] = val; }
 
-        // Switch to private functions after Vector is made its own class in new file
-        void jacobiSaveInputs(int start, int end, Matrix* saveEq, Matrix::Vector* constants, Matrix::Vector* saveConst);
-        void jacobiSwitchAndDivide(int start, int end, Matrix::Vector* constants, Matrix::Vector* solution, Matrix::Vector *prev, int synchOffset);
-        void jacobiFirstIteration(int start, int end, Matrix::Vector* solution, Matrix::Vector *prev, int synchOffset);
-        void jacobiRemainingIterations(int start, int end, Matrix::Vector* solution, Matrix::Vector *prev, int synchOffset);
-        void jacobiRestoreInputs(int start, int end, Matrix* saveEq, Matrix::Vector* constants, Matrix::Vector* saveConst);
+            int determinant(double* A, int n, int order);
+            void adjoint(double* A, double* adj, int order, int processID, int processCount);
+            void getCofactor(double* A, double* temp, int p, int q, int n, int order);
+            
+            void inverse(Matrix* inverse);
+            void luDecomposition(Matrix* lower, Matrix* upper);
+            void backwardSubstitution(float* b, float* x);
+            void forwardSubstitution(float *b, float* x); 
 
-};
+            void solveSystem(Vector* constants, Vector* solution);
+            void jacobi(Vector* constants, Vector* solution);
+            void failSafe(Vector* constants, Vector* solution);
+            bool isDiagonallyDominant();
 
-class Matrix::Vector
-{
-    private:
-        int dim;
-        double* arr;
-        //Simpi* mysimpi = NULL;  // for later reference
-        std::string uniqueID;
-        
-    public:
-        Vector(int a);
-        ~Vector();
-
-        int getSimpiID() const { return Matrix::mainSimpi->getID(); }
-        int getSize() const { return dim; }
-        double& getRef(int pos) { return arr[pos]; }
-        double getVal(int pos) const { return arr[pos]; }
-        void set(int pos, double val) { arr[pos] = val; }
-        
-        friend std::ostream& operator<<(std::ostream& out, const Matrix::Vector& v);     
-};
-
+            friend std::ostream& operator<<(std::ostream& out, const Matrix& m);      
+            // overload +, -, *, /, ..... 
+    };
+}
 #endif

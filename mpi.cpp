@@ -11,6 +11,7 @@
 #include <vector>
 
 #include "Simpi.h"
+using namespace SimpiNS;
 
 void createSynchObject(int processCount);
 void runParallelProcesses(char *progname, int processCount);
