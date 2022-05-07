@@ -22,9 +22,9 @@ Simpi::Simpi(int _id, int _processCount)
 
 Simpi::~Simpi()
 {
-    for (std::pair<std::string, MatrixMetadata> matrix : matrixInfo) {
+    for (std::pair<std::string, MatrixMetadata> matrix : matrixInfo) 
         freeMatrix(matrix.second.uniqueID);
-    }
+    
     shm_unlink(SYNCH_OBJECT_MEM_NAME);
     close(shm_fd);
     munmap(synchInfo, sizeof(SynchObject) + sizeof(int) * (processCount + 1));
@@ -58,75 +58,79 @@ void Simpi::synch()
 
 std::pair<std::string, double*> Simpi::createMatrix(int x, int y)
 {
-    
+    std::string uniqueID;
+    double* matrix;
+
+    int fd;
     size_t size = x * y * sizeof(double);
     if (id == 0) 
     {
-        // generate a uniqueid for matrix
-        std::string uniqueID = getSharedMemName();
-        
-        // create a shared mem object
-        int fd = shm_open(uniqueID.c_str(), O_RDWR | O_CREAT, 0777);
-        if (fd == -1) 
-        {
-            std::string msg = std::to_string(id) + ": Unable to shm_open matrix (" + uniqueID + "):  ";
-            perror(msg.c_str());
-            exit(1);
-        }
-        ftruncate(fd, size);
-
-        // allocate matrix
-        double* matrix = (double*)mmap(NULL, size, PROT_READ | PROT_WRITE, MAP_SHARED, fd, 0);
-        if (matrix == MAP_FAILED)
-        {
-            perror("Unable to mmap matrix: ");
-            exit(1);
-        }
-
-        MatrixMetadata metadata;
-        metadata.size = size;
-        metadata.fileDescriptor = fd;
-        strcpy(metadata.uniqueID, uniqueID.c_str());
-        metadata.matrixData = matrix;
-        matrixInfo[uniqueID] = metadata;
-
-        // write name to synch_object so that other processes can get the uniqie
-        // id
-        strcpy(synchInfo->lastMatrixID, uniqueID.c_str());
+        uniqueID = getSharedMemName();
+        matrix = initializeMatrixMemory_LeaderThread(fd, uniqueID, size); // file descriptor (int fd) passed by reference
+        strcpy(synchInfo->lastMatrixID, uniqueID.c_str()); // Makes uniqueID available to follower processes
         synch();
-        return std::make_pair(uniqueID, matrix);
+        createMatrixMetadata(size, fd, uniqueID, matrix);
     }
     else 
     {
-        // wait for id 0 to create the shared memory for matrix
-        synch();
-        // get the unique id from the synch object
-        std::string uniqueID = synchInfo->lastMatrixID;
-        // open and allocate the shared memory
-        int fd = shm_open(uniqueID.c_str(), O_RDWR, 0777);
-        if (fd == -1) 
-        {
-            std::string msg = std::to_string(id) + ": Unable to shm_open matrix (" + uniqueID + "):  ";
-            perror(msg.c_str());
-            exit(1);
-        }
-
-        double* matrix = (double*)mmap(NULL, size, PROT_READ | PROT_WRITE, MAP_SHARED, fd, 0);
-        if (matrix == MAP_FAILED) 
-        {
-            std::string msg = std::to_string(id) + ": Unable to mmap matrix: ";
-            perror(msg.c_str());
-            exit(1);
-        }
-
-        // create a metadata object
-        MatrixMetadata metadata;
-        strcpy(metadata.uniqueID, uniqueID.c_str());
-        metadata.fileDescriptor = fd;
-        metadata.matrixData = matrix;
-        matrixInfo[uniqueID] = metadata;
-        return std::make_pair(uniqueID, matrix);
+        synch(); 
+        uniqueID = synchInfo->lastMatrixID; // Gets uniqueID from leader process
+        matrix = initializeMatrixMemory_FollowerThread(fd, uniqueID, size);  // file descriptor (int fd) passed by reference
+        createMatrixMetadata(size, fd, uniqueID, matrix);
     }
+
+    synch();
+    return std::make_pair(uniqueID, matrix);
+}
+
+double *Simpi::initializeMatrixMemory_LeaderThread(int &fd, const std::string &uniqueID, int size)
+{
+    fd = shm_open(uniqueID.c_str(), O_RDWR | O_CREAT, 0777); 
+    if (fd == -1) 
+    {
+        std::string msg = std::to_string(id) + ": Unable to shm_open matrix (" + uniqueID + "):  ";
+        perror(msg.c_str());
+        exit(1);
+    }
+    ftruncate(fd, size);
+
+    double *matrix = (double*)mmap(NULL, size, PROT_READ | PROT_WRITE, MAP_SHARED, fd, 0);
+    if (matrix == MAP_FAILED)
+    {
+        perror("Unable to mmap matrix: ");
+        exit(1);
+    }
+    return matrix;
+}
+
+double* Simpi::initializeMatrixMemory_FollowerThread(int &fd, const std::string &uniqueID, int size)
+{
+    fd = shm_open(uniqueID.c_str(), O_RDWR, 0777); 
+    if (fd == -1) 
+    {
+        std::string msg = std::to_string(id) + ": Unable to shm_open matrix (" + uniqueID + "):  ";
+        perror(msg.c_str());
+        exit(1);
+    }
+
+    double *matrix = (double*)mmap(NULL, size, PROT_READ | PROT_WRITE, MAP_SHARED, fd, 0);
+    if (matrix == MAP_FAILED) 
+    {
+        std::string msg = std::to_string(id) + ": Unable to mmap matrix: ";
+        perror(msg.c_str());
+        exit(1);
+    }
+    return matrix;
+}
+
+void Simpi::createMatrixMetadata(int size, int fd, std::string uniqueID, double *matrix)
+{
+    MatrixMetadata metadata;
+    metadata.size = size;
+    metadata.fileDescriptor = fd;
+    strcpy(metadata.uniqueID, uniqueID.c_str());
+    metadata.matrixData = matrix;
+    matrixInfo[uniqueID] = metadata;
 }
 
 void Simpi::freeMatrix(std::string uniqueID)

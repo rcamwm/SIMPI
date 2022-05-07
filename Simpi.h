@@ -53,6 +53,11 @@ class Simpi
         SynchObject* synchInfo;
         std::map<std::string, MatrixMetadata> matrixInfo;
         std::string getSharedMemName();
+
+        double *initializeMatrixMemory_LeaderThread(int &fd, const std::string &uniqueID, int size);
+        double *initializeMatrixMemory_FollowerThread(int &fd, const std::string &uniqueID, int size);
+        void createMatrixMetadata(int size, int fd, std::string uniqueID, double *matrix);
+
 };
 
 #endif

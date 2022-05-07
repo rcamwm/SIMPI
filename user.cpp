@@ -3,8 +3,8 @@
 
 #include "Simpi.h"
 #include "Matrix.h"
-#define MATRIX_DIMENSION_X 3
-#define MATRIX_DIMENSION_Y 3
+#define MATRIX_DIMENSION_X 10
+#define MATRIX_DIMENSION_Y 10
 
 int processID;
 
@@ -20,8 +20,8 @@ int main(int argc, char* argv[])
     Simpi *mainSimpi = initializeProcess(argv[1], argv[2]);
 
     testInverse(mainSimpi);
-    testSolveSystemJacobi(mainSimpi);
-    testSolveSystemInverse(mainSimpi);
+    // testSolveSystemJacobi(mainSimpi);
+    // testSolveSystemInverse(mainSimpi);
 }
 
 Simpi *initializeProcess(char* processIDString, char* processCountString)
@@ -105,7 +105,6 @@ void testSolveSystemInverse(Simpi *mainSimpi)
     A.solveSystem(&B, &C);
     std::cout << A << "times\n" << C << "equals\n" << B;
 }
-
 
 void testInverse(Simpi *mainSimpi)
 {

@@ -88,16 +88,16 @@ void Matrix::adjoint(double* A, double* adj, int order, int processID, int proce
     {
         for (int j = start; j < end; j++) 
         {
-        // Get cofactor of A[i][j]
-        getCofactor(A, temp, i, j, order, order);
+            // Get cofactor of A[i][j]
+            getCofactor(A, temp, i, j, order, order);
 
-        // sign of adj[j][i] positive if sum of row
-        // and column indexes is even.
-        sign = ((i + j) % 2 == 0) ? 1 : -1;
+            // sign of adj[j][i] positive if sum of row
+            // and column indexes is even.
+            sign = ((i + j) % 2 == 0) ? 1 : -1;
 
-        // Interchanging rows and columns to get the
-        // transpose of the cofactor Matrix
-        adj[j + i * order] = (sign) * (determinant(temp, order - 1, order));
+            // Interchanging rows and columns to get the
+            // transpose of the cofactor Matrix
+            adj[j + i * order] = (sign) * (determinant(temp, order - 1, order));
         }
     }
 }
@@ -262,8 +262,8 @@ LX = Z
 B corresponds to individual columns of an nxn identity Matrix
 X represents each corresponding column of the inverse Matrix
 */
-void Matrix::inverse(Matrix* inv) {
-
+void Matrix::inverse(Matrix* inv) 
+{
     //Check if Matrix is square
     if (getX() != getY()) 
     {
