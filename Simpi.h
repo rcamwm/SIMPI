@@ -45,6 +45,7 @@ class Simpi
 
         void freeMatrix(std::string uniqueID);
         void synch();
+        void synchExtraCycles(int cycles);
 
     private:
         int id;
@@ -52,7 +53,7 @@ class Simpi
         int shm_fd;
         SynchObject* synchInfo;
         std::map<std::string, MatrixMetadata> matrixInfo;
-        std::string getSharedMemName();
+        std::string getSharedMemoryName();
 
         double *initializeMatrixMemory_LeaderThread(int &fd, const std::string &uniqueID, int size);
         double *initializeMatrixMemory_FollowerThread(int &fd, const std::string &uniqueID, int size);

@@ -10,7 +10,6 @@ class Matrix
         double* arr;
         std::string uniqueID;
         static Simpi* mainSimpi;
-        //simpi* mysimpi = NULL;  // for later reference
 
     public:
         class Vector;
@@ -42,6 +41,14 @@ class Matrix
 
         friend std::ostream& operator<<(std::ostream& out, const Matrix& m);      
         // overload +, -, *, /, ..... 
+
+        // Switch to private functions after Vector is made its own class in new file
+        void jacobiSaveInputs(int start, int end, Matrix* saveEq, Matrix::Vector* constants, Matrix::Vector* saveConst);
+        void jacobiSwitchAndDivide(int start, int end, Matrix::Vector* constants, Matrix::Vector* solution, Matrix::Vector *prev, int synchOffset);
+        void jacobiFirstIteration(int start, int end, Matrix::Vector* solution, Matrix::Vector *prev, int synchOffset);
+        void jacobiRemainingIterations(int start, int end, Matrix::Vector* solution, Matrix::Vector *prev, int synchOffset);
+        void jacobiRestoreInputs(int start, int end, Matrix* saveEq, Matrix::Vector* constants, Matrix::Vector* saveConst);
+
 };
 
 class Matrix::Vector
@@ -49,7 +56,7 @@ class Matrix::Vector
     private:
         int dim;
         double* arr;
-        Simpi* mysimpi = NULL;  // for later reference
+        //Simpi* mysimpi = NULL;  // for later reference
         std::string uniqueID;
         
     public:

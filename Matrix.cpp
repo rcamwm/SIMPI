@@ -410,50 +410,85 @@ void Matrix::backwardSubstitution(float* b, float* x)
 }
 
 /*
-Solves a linear system of equations in parallel if the Matrix is diagonally dominant
-outputs solution to a Vector of 0s passed into it
-void->void
+    Solves a linear system of equations in parallel if the Matrix is diagonally dominant
+    outputs solution to a Vector of 0s passed into it
+    void->void
 */
-
-void Matrix::jacobi(Matrix::Vector* constants, Matrix::Vector* solution) {
-
-    int processCount = mainSimpi->getProcessCount();
+void Matrix::jacobi(Matrix::Vector* constants, Matrix::Vector* solution) 
+{
     int id = mainSimpi->getID();
-
-    Matrix::Vector *prev = new Matrix::Vector(constants->getSize()); // shared mem containing a copy of values
-
+    int processCount = mainSimpi->getProcessCount();
+    if (processCount > constants->getSize()) 
+        processCount = constants->getSize();
+    
     Matrix* saveEq = new Matrix(getX(), getY() + 1); // save equations from modification
     Matrix::Vector* saveConst = new Matrix::Vector(constants->getSize()); // saves input vector
+    Matrix::Vector *prev = new Matrix::Vector(constants->getSize()); // shared mem containing a copy of values
 
-
-    int work = constants->getSize() / processCount;
-
-    int i, j, k;
-    int start = id * work;
-    int end = start + work;
-
+    int work = constants->getSize() / processCount; 
+    int start = 0;
+    int end = 0;
+    if (id < processCount) // Extra processes get no work => start and end stay at 0
+    {
+        start = id * work;
+        end = start + work;
+    }
+    int remainingWork = constants->getSize() % processCount;
+    if (id == processCount - 1) // Last active process gets all remaining work
+        end += remainingWork;
+    // synch() is called (end - start) number of times in several jacobi helper functions
+    // synchOffset makes sure that all processes stay in sync even if some processes are doing more work than others
+    int synchOffset = (work + remainingWork) - end + start;
     mainSimpi->synch();
 
-    //Save Matrix and Vector
-    for (i = start; i < end; i++) 
+
+    jacobiSaveInputs(start, end, saveEq, constants, saveConst);
+    mainSimpi->synch();
+
+    // Switches diagonals with solution elements,
+    // then divides each matrix row by their original diagonal element 
+    jacobiSwitchAndDivide(start, end, constants, solution, prev, synchOffset);
+    mainSimpi->synch();
+
+    // First iteration with substitution 1
+    jacobiFirstIteration(start, end, solution, prev, synchOffset);
+    mainSimpi->synch();
+
+    // Repeat iterations with calculated results
+    jacobiRemainingIterations(start, end, solution, prev, synchOffset);
+    mainSimpi->synch();
+
+    jacobiRestoreInputs(start, end, saveEq, constants, saveConst);
+    mainSimpi->synch();
+
+    return;
+}
+
+void Matrix::jacobiSaveInputs(int start, int end, Matrix* saveEq, Matrix::Vector* constants, Matrix::Vector* saveConst)
+{
+    for (int i = start; i < end; i++) 
     {
-        for (j = 0; j < getY(); j++) 
+        for (int j = 0; j < getY(); j++) 
             saveEq->get(i,j) = get(i, j);
 
         saveEq->get(i,getY() + 1) = constants->getRef(i);
         saveConst->getRef(i) = constants->getRef(i);
     }
+}
 
-    //synch, wait for all process before solving
-    mainSimpi->synch();
-
-    //setup, switch var coefficient with row solution, and divide by coefficient
-    for (i = start; i < end; i++) 
+/*
+    In each row, the diagonal element of the matrix is switched with the corresponding element from the solution vector.
+    Every element of that matrix row is then divided by the value that was just placed in the solution vector.
+    Each element of that matrix row that was not switched is also multiplied by -1.
+*/
+void Matrix::jacobiSwitchAndDivide(int start, int end, Matrix::Vector* constants, Matrix::Vector* solution, Matrix::Vector *prev, int synchOffset)
+{
+    for (int i = start; i < end; i++) 
     {
         double temp = get(i, i);
         get(i, i) = constants->getRef(i);
         constants->getRef(i) = temp;
-        for (j = 0; j < getY(); j++) 
+        for (int j = 0; j < getY(); j++) 
         {
             if (j != i)
                 get(i, j) *= -1;
@@ -465,13 +500,15 @@ void Matrix::jacobi(Matrix::Vector* constants, Matrix::Vector* solution) {
         solution->getRef(i) = constants->getRef(i);
         mainSimpi->synch();
     }
+    mainSimpi->synchExtraCycles(synchOffset);
+}
 
-    mainSimpi->synch();
-    // first iteration by trying substituting 1
-    for (i = start; i < end; i++) 
+void Matrix::jacobiFirstIteration(int start, int end, Matrix::Vector* solution, Matrix::Vector *prev, int synchOffset)
+{
+    for (int i = start; i < end; i++) 
     {
         double rowSum = 0;
-        for (j = 0; j < getY(); j++) 
+        for (int j = 0; j < getY(); j++) 
         {
             if (j == i)
                 rowSum += get(i, j);
@@ -483,22 +520,24 @@ void Matrix::jacobi(Matrix::Vector* constants, Matrix::Vector* solution) {
         solution->getRef(i) = rowSum;
         mainSimpi->synch();
     }
+    mainSimpi->synchExtraCycles(synchOffset);
+}
 
-    //wait for all processes before repeating iterations with calculated results
-    //mainSimpi->synch();
-
-    for (k = 0; k < 1000; k++)
+void Matrix::jacobiRemainingIterations(int start, int end, Matrix::Vector* solution, Matrix::Vector *prev, int synchOffset)
+{
+    for (int k = 0; k < 1000; k++)
     {
-        for (i = start; i < end; i++)
+        for (int i = start; i < end; i++)
         {
             //save prev value for comparision
             prev->getRef(i) = solution->getRef(i);
             mainSimpi->synch();
         }
-        for (i = start; i < end; i++)
+        mainSimpi->synchExtraCycles(synchOffset);
+        for (int i = start; i < end; i++)
         {
             double rowSum = 0;
-            for (j = 0; j < getY(); j++)
+            for (int j = 0; j < getY(); j++)
             {
                 if (j == i) {
                     rowSum += get(i, j);
@@ -512,21 +551,18 @@ void Matrix::jacobi(Matrix::Vector* constants, Matrix::Vector* solution) {
         //wait at end of each loop for all processes before beginning next iteration
         mainSimpi->synch();
     }
-    mainSimpi->synch();
-    //restore original Matrix and Vector
-    for (i = start; i < end; i++) 
+}
+
+void Matrix::jacobiRestoreInputs(int start, int end, Matrix* saveEq, Matrix::Vector* constants, Matrix::Vector* saveConst)
+{
+    for (int i = start; i < end; i++) 
     {
-        for (j = 0; j < getY(); j++) 
+        for (int j = 0; j < getY(); j++) 
             get(i, j) = saveEq->get(i,j);
         
         constants->getRef(i) = saveConst->getRef(i);
     }
-    //wait for all processes before returning solution Vector
-    mainSimpi->synch();
-    //return solution;
-    return;
 }
-
 
 /*
 Checks if a square Matrix is diagonally dominant
@@ -535,6 +571,8 @@ none->bool
 */
 bool Matrix::isDiagonallyDominant()
 {
+    if (getX() != getY()) // Only square matrices can be diagonally dominant
+        return false;
     for(int i = 0; i < getX(); i ++)
     {
         double sq;
@@ -558,7 +596,7 @@ void -> void
 */
 void Matrix::solveSystem(Matrix::Vector *constants, Matrix::Vector* solution)
 {
-    bool dd = isDiagonallyDominant();
+    bool dd = isDiagonallyDominant(); 
     mainSimpi->synch();
     if (dd)
     {
@@ -584,7 +622,6 @@ void Matrix::failSafe(Matrix::Vector* constants, Matrix::Vector* solution)
 {
     Matrix* inv = new Matrix(getX(), getY());
     inverse(inv);
-    std::cout << "inverse calculated" << std::endl;
     mainSimpi->synch();
 
     int processCount = mainSimpi->getProcessCount();

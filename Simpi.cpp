@@ -56,6 +56,12 @@ void Simpi::synch()
     }
 }
 
+void Simpi::synchExtraCycles(int cycles)
+{
+    for (int i = 0; i < cycles; i++)
+        synch();
+}
+
 std::pair<std::string, double*> Simpi::createMatrix(int x, int y)
 {
     std::string uniqueID;
@@ -65,8 +71,8 @@ std::pair<std::string, double*> Simpi::createMatrix(int x, int y)
     size_t size = x * y * sizeof(double);
     if (id == 0) 
     {
-        uniqueID = getSharedMemName();
-        matrix = initializeMatrixMemory_LeaderThread(fd, uniqueID, size); // file descriptor (int fd) passed by reference
+        uniqueID = getSharedMemoryName();
+        matrix = initializeMatrixMemory_LeaderThread(fd, uniqueID, size); // fd passed by reference and initialized
         strcpy(synchInfo->lastMatrixID, uniqueID.c_str()); // Makes uniqueID available to follower processes
         synch();
         createMatrixMetadata(size, fd, uniqueID, matrix);
@@ -75,7 +81,7 @@ std::pair<std::string, double*> Simpi::createMatrix(int x, int y)
     {
         synch(); 
         uniqueID = synchInfo->lastMatrixID; // Gets uniqueID from leader process
-        matrix = initializeMatrixMemory_FollowerThread(fd, uniqueID, size);  // file descriptor (int fd) passed by reference
+        matrix = initializeMatrixMemory_FollowerThread(fd, uniqueID, size);  // fd passed by reference and initialized
         createMatrixMetadata(size, fd, uniqueID, matrix);
     }
 
@@ -143,7 +149,7 @@ void Simpi::freeMatrix(std::string uniqueID)
     munmap(metadata.matrixData, metadata.size);
 }
 
-std::string Simpi::getSharedMemName()
+std::string Simpi::getSharedMemoryName()
 {
     // gets a unique name for each shared memory based on the time that each was
     // made
