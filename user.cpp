@@ -3,6 +3,7 @@
 
 #include "Simpi.h"
 #include "Matrix.h"
+#include "Vector.h"
 #define MATRIX_DIMENSION_X 5
 #define MATRIX_DIMENSION_Y 5
 using namespace SimpiNS;
@@ -48,7 +49,7 @@ void testSolveSystemJacobi(Simpi *mainSimpi)
     {
         for (int x = 0; x < MATRIX_DIMENSION_X; x++)
             if (mainSimpi->getID() == 0 && x == y)
-                A.get(x, y) *= 10;
+                A.get(x, y) *= 30;
     }
     mainSimpi->synch();
 
