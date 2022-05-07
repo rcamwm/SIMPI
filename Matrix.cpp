@@ -1,21 +1,21 @@
 #include "Matrix.h"
 
 // Must be set before any Matrix objects are created
-Simpi* Matrix::main_simpi;
+Simpi* Matrix::mainSimpi;
 
-Matrix::Matrix(int x, int y)  // constructor
+Matrix::Matrix(int x, int y)
 {
-  // use main_simp init the Matrix for all processes. The id is also in simp
-  std::pair<std::string, double*> pass_back(main_simpi->create_matrix(x, y));
-  unique_id = pass_back.first;
-  arr = pass_back.second;
-  xdim = x;
-  ydim = y;
+    // use mainSimpi to init the Matrix for all processes. The id is also in simp
+    std::pair<std::string, double*> passBack(mainSimpi->createMatrix(x, y));
+    uniqueID = passBack.first;
+    arr = passBack.second;
+    xdim = x;
+    ydim = y;
 }
-Matrix::~Matrix()  // destructor
+
+Matrix::~Matrix()
 {
-  // use main_simpi for getting rid of the mem and unlink stuff
-  main_simpi->free_matrix(unique_id);
+    mainSimpi->freeMatrix(uniqueID); // frees and unlinks memory
 }
 
 std::ostream& operator<<(std::ostream& out, const Matrix& m)
@@ -32,12 +32,8 @@ std::ostream& operator<<(std::ostream& out, const Matrix& m)
             }
         }
         out << std::endl;
-        return out;
     }
-    else
-    {
-        return out;
-    }
+    return out;
 }
 
 /*
@@ -45,61 +41,65 @@ This is a helper function to calculate the determinant of a Matrix
 */
 int Matrix::determinant(double* A, int n, int order)
 {
-  int D = 0;  // Initialize result
+    int D = 0;  // Initialize result
 
-  //  Base case : if Matrix contains single element
-  if (n == 1)
-    return A[0];
+    //  Base case : if Matrix contains single element
+    if (n == 1)
+        return A[0];
 
-  double temp[order * order];  // To store cofactors
+    double temp[order * order];  // To store cofactors
 
-  int sign = 1;  // To store sign multiplier
+    int sign = 1;  // To store sign multiplier
 
-  // Iterate for each element of first row
-  for (int f = 0; f < n; f++) {
-    // Getting Cofactor of A[0][f]
-    getCofactor(A, temp, 0, f, n, order);
-    D += sign * A[0 + f * order] * determinant(temp, n - 1, order);
+    // Iterate for each element of first row
+    for (int f = 0; f < n; f++) 
+    {
+        // Getting Cofactor of A[0][f]
+        getCofactor(A, temp, 0, f, n, order);
+        D += sign * A[0 + f * order] * determinant(temp, n - 1, order);
 
-    // terms are to be added with alternate sign
-    sign = -sign;
-  }
+        // terms are to be added with alternate sign
+        sign = -sign;
+    }
 
-  return D;
+    return D;
 }
 
 /*
 This is a helper function to calculate the adjoint of a Matrix
 */
-void Matrix::adjoint(double* A, double* adj, int order, int par_id, int par_count)
+void Matrix::adjoint(double* A, double* adj, int order, int processID, int processCount)
 {
-  if (order == 1) {
-    adj[0] = 1;
-    return;
-  }
-
-  int rpp = order / par_count;
-  int start = par_id * rpp;
-  int end = start + rpp;
-
-  // temp is used to store cofactors of A[][]
-  int sign = 1;
-  double temp[order * order];
-
-  for (int i = 0; i < order; i++) {
-    for (int j = start; j < end; j++) {
-      // Get cofactor of A[i][j]
-      getCofactor(A, temp, i, j, order, order);
-
-      // sign of adj[j][i] positive if sum of row
-      // and column indexes is even.
-      sign = ((i + j) % 2 == 0) ? 1 : -1;
-
-      // Interchanging rows and columns to get the
-      // transpose of the cofactor Matrix
-      adj[j + i * order] = (sign) * (determinant(temp, order - 1, order));
+    if (order == 1) 
+    {
+        adj[0] = 1;
+        return;
     }
-  }
+
+    int rpp = order / processCount;
+    int start = processID * rpp;
+    int end = start + rpp;
+
+    // temp is used to store cofactors of A[][]
+    int sign = 1;
+    double temp[order * order];
+
+    for (int i = 0; i < order; i++) 
+    {
+        for (int j = start; j < end; j++) 
+        {
+        // Get cofactor of A[i][j]
+        getCofactor(A, temp, i, j, order, order);
+
+        // sign of adj[j][i] positive if sum of row
+        // and column indexes is even.
+        sign = ((i + j) % 2 == 0) ? 1 : -1;
+
+        // Interchanging rows and columns to get the
+        // transpose of the cofactor Matrix
+        adj[j + i * order] = (sign) * (determinant(temp, order - 1, order));
+        }
+    }
 }
 
 /*
@@ -107,25 +107,29 @@ This is a helper function to calculate the cofactor of a Matrix
 */
 void Matrix::getCofactor(double* A, double* temp, int p, int q, int n, int order)
 {
-  int i = 0, j = 0;
+    int i = 0, j = 0;
 
-  // Looping for each element of the Matrix
-  for (int row = 0; row < n; row++) {
-    for (int col = 0; col < n; col++) {
-      //  Copying into temporary Matrix only those element
-      //  which are not in given row and column
-      if (row != p && col != q) {
-        temp[(i) + (j++) * order] = A[row + col * order];
+    // Looping for each element of the Matrix
+    for (int row = 0; row < n; row++) 
+    {
+        for (int col = 0; col < n; col++) 
+        {
+            //  Copying into temporary Matrix only those element
+            //  which are not in given row and column
+            if (row != p && col != q) 
+            {
+                temp[(i) + (j++) * order] = A[row + col * order];
 
-        // Row is filled, so increase row index and
-        // reset col index
-        if (j == n - 1) {
-          j = 0;
-          i++;
+                // Row is filled, so increase row index and
+                // reset col index
+                if (j == n - 1) 
+                {
+                    j = 0;
+                    i++;
+                }
+            }
         }
-      }
     }
-  }
 }
 
 /*
@@ -135,108 +139,119 @@ A = LU
 */
 void Matrix::luDecomposition(Matrix* lower, Matrix* upper) {
 
-  // Check if Matrix is square
-  if (get_x() != get_y()) {
-    std::cout << "Invalid Matrix";
-    exit(1);
-  }
-
-  for (int i = 0; i < get_x(); i++) {
-    // Calculate work per parallel process
-    // Has to be calculated on every loop iteration as the inner loop is decrementing
-    int num_processes = main_simpi->getProcessCount();
-    int parID = main_simpi->getID();
-    int total = xdim - i;
-    if (num_processes > total) {
-      num_processes = total;
-    }
-    int rpp = total/num_processes;
-    int start = rpp*main_simpi->getID() + i;
-    int end = start + rpp;
-
-    // Upper Triangular 
-    for (int k = start; k< end; k++) {
-      if (k>=get_x()) {
-        break;
-      }
-      // Summation of L(i, j) * U(j, k) 
-      float sum = 0;
-      for (int j = 0; j < i; j++) 
-        sum += (lower->get(i,j)* upper->get(j,k)); 
-
-      // Evaluating U(i, k) 
-      upper->get(i,k) = get(i,k) - sum; 
-
+    // Check if Matrix is square
+    if (getX() != getY()) 
+    {
+        std::cout << "Invalid Matrix";
+        exit(1);
     }
 
-    // Calculate and execute which processes take the leftover work 
-    if (total%num_processes != 0) {
-      int leftover = total%num_processes;
-      if (parID < leftover) {
-        parID += (xdim-leftover);
-        int start = parID;
-        int end = start + 1;
-        for (int a = start; a<end; a++) {
-          // Summation of L(i, j) * U(j, k) 
-          float sum = 0;
-          for (int j= 0; j<i; j++) 
-            sum+= (lower->get(i,j)*upper->get(j,a));
-          // Evaluating U(i, k) 
-          upper->get(i,a) = get(i,a) - sum;
-        }
-      }
-    }
+    for (int i = 0; i < getX(); i++) 
+    {
+        // Calculate work per parallel process
+        // Has to be calculated on every loop iteration as the inner loop is decrementing
+        int processCount = mainSimpi->getProcessCount();
+        int processID = mainSimpi->getID();
+        int total = xdim - i;
+        if (processCount > total)
+            processCount = total;
 
-    main_simpi->synch();
+        int rpp = total / processCount;
+        int start = rpp * mainSimpi->getID() + i;
+        int end = start + rpp;
 
-    total = get_x() - i;
-    parID = main_simpi->getID();
-    num_processes = main_simpi->getProcessCount();
+        // Upper Triangular 
+        for (int k = start; k < end; k++) 
+        {
+            if (k >= getX())
+                break;
 
-    // Lower Triangular
-    for (int k = start; k<end; k++) {
-      if (k>=get_x()) {
-        break;
-      }
-      if (i == k) {
-        lower->get(i,i) = 1; // Diagonal as 1 
-      }
-      else {
-        // Summation of L(k, j) * U(j, i)
-        float sum = 0;
-        for (int j = 0; j<i; j++) 
-          sum += (lower->get(k,j) * upper->get(j,i));
-        // Evaluating L(k, i)
-        lower->get(k,i) = ((get(k,i)-sum) / upper->get(i,i));
-      }
-    }
-
-    // Calculate and execute which processes take the leftover work 
-    if (total%num_processes != 0) {
-      int leftover = total%num_processes;
-      if (parID < leftover) {
-        parID += (get_x()-leftover);
-        int start = parID;
-        int end = start + 1;
-        for (int a = start; a<end; a++) {
-          if (i == a)
-            lower->get(i,i) = 1; // Diagonal as 1
-          else {
-            // Summation of L(k, j) * U(j, i) 
+            // Summation of L(i, j) * U(j, k) 
             float sum = 0;
-            for (int j = 0; j<i; j++) 
-              sum+= (lower->get(a,j) * upper->get(j,i));
+            for (int j = 0; j < i; j++) 
+                sum += (lower->get(i, j) * upper->get(j, k)); 
 
-            // Evaluating L(k, i) 
-            lower->get(a,i) = (get(a,i)-sum) / upper->get(i,i);
-          }
+            // Evaluating U(i, k) 
+            upper->get(i,k) = get(i,k) - sum; 
+
         }
-      }
-    }
-    main_simpi->synch();
 
-  }
-return;
+        // Calculate and execute which processes take the leftover work 
+        if (total % processCount != 0) 
+        {
+            int leftover = total % processCount;
+            if (processID < leftover) 
+            {
+                processID += (xdim - leftover);
+                int start = processID;
+                int end = start + 1;
+                for (int a = start; a < end; a++) 
+                {
+                    // Summation of L(i, j) * U(j, k) 
+                    float sum = 0;
+                    for (int j = 0; j < i; j++) 
+                        sum += (lower->get(i, j) * upper->get(j, a));
+
+                    // Evaluating U(i, k) 
+                    upper->get(i, a) = get(i, a) - sum;
+                }
+            }
+        }
+
+        mainSimpi->synch();
+
+        total = getX() - i;
+        processID = mainSimpi->getID();
+        processCount = mainSimpi->getProcessCount();
+
+        // Lower Triangular
+        for (int k = start; k < end; k++) 
+        {
+            if (k >= getX())
+                break;
+            
+            if (i == k)
+                lower->get(i, i) = 1; // Diagonal as 1 
+            else 
+            {
+                // Summation of L(k, j) * U(j, i)
+                float sum = 0;
+                for (int j = 0; j < i; j++) 
+                sum += (lower->get(k, j) * upper->get(j, i));
+                // Evaluating L(k, i)
+                lower->get(k, i) = ((get(k, i) - sum) / upper->get(i, i));
+            }
+        }
+
+        // Calculate and execute which processes take the leftover work 
+        if (total % processCount != 0) 
+        {
+            int leftover = total % processCount;
+            if (processID < leftover) 
+            {
+                processID += (getX() - leftover);
+                int start = processID;
+                int end = start + 1;
+                for (int a = start; a < end; a++) 
+                {
+                    if (i == a)
+                        lower->get(i, i) = 1; // Diagonal as 1
+                    else 
+                    {
+                        // Summation of L(k, j) * U(j, i) 
+                        float sum = 0;
+                        for (int j = 0; j < i; j++) 
+                        sum += (lower->get(a, j) * upper->get(j, i));
+
+                        // Evaluating L(k, i) 
+                        lower->get(a, i) = (get(a, i)-sum) / upper->get(i, i);
+                    }
+                }
+            }
+        }
+        mainSimpi->synch();
+    }
+    return;
 }
 
 /*
@@ -249,156 +264,148 @@ X represents each corresponding column of the inverse Matrix
 */
 void Matrix::inverse(Matrix* inv) {
 
-  //Check if Matrix is square
-  if (get_x() != get_y()) {
-    std::cout << "Invalid Matrix";
-    exit(1);
-  }
+    //Check if Matrix is square
+    if (getX() != getY()) 
+    {
+        std::cout << "Invalid Matrix";
+        exit(1);
+    }
 
+    //Solve for lower and upper matrices
+    Matrix* upper = new Matrix(getX(), getY());
+    Matrix* lower = new Matrix(getX(), getY());
+    luDecomposition(lower,upper);
+    mainSimpi->synch();
 
-  //Solve for lower and upper matrices
-  Matrix* upper = new Matrix(get_x(), get_y());
-  Matrix* lower = new Matrix(get_x(), get_y());
-  luDecomposition(lower,upper);
-  main_simpi->synch();
-
-  //Create Identity nxn Matrix
-  Matrix* identity = new Matrix(get_x(), get_y());
-  if (main_simpi->getID() == 0) {
-    for (int i = 0; i<get_x(); i++) {
-      for (int j = 0; j<get_x(); j++) {
-        if (i == j) {
-          identity->get(i,j) = 1;
+    //Create Identity nxn Matrix
+    Matrix* identity = new Matrix(getX(), getY());
+    if (mainSimpi->getID() == 0) 
+    {
+        for (int i = 0; i<getX(); i++) 
+        {
+            for (int j = 0; j<getX(); j++)            
+                (i == j) ? identity->get(i,j) = 1 : identity->get(i,j) = 0; 
         }
-        else {
-          identity->get(i,j) = 0;                
-        }
-      }
-    }
-  }
-
-  main_simpi->synch();
-
-  // Calculate columns per parallel process
-  int processCount = main_simpi->getProcessCount();
-  if (processCount > get_x()) {
-    processCount = get_x();
-  }
-  int cpp = get_x()/processCount;
-  int start = cpp*main_simpi->getID();
-  int end = start + cpp;
-
-  // Initialize necessary arrays for future calculations
-  // Each array is local to its own process
-  float identity_col[get_x()];
-  float z_col[get_x()];
-  float soln_col[get_x()];
-
-  for (int a = start; a<end; a++) {
-
-    //Get individual columns of identity Matrix
-    for (int b = 0; b<get_x(); b++) {
-      identity_col[b] = identity->get(b,a);
     }
 
-    //Reset Z column to solve for again
-    for (int d = 0; d<get_x(); d++) {
-      z_col[d] = 0;
-    }
-  
-    //Solve LZ = I
-    (*lower).forward_substitution(identity_col, z_col);
+    mainSimpi->synch();
 
-    //Reset X column to solve for again
-    for (int d = 0; d<get_x(); d++) {
-      soln_col[d] = 0;
-    }
+    // Calculate columns per parallel process
+    int processCount = mainSimpi->getProcessCount();
+    if (processCount > getX()) 
+        processCount = getX();
+    
+    int cpp = getX() / processCount;
+    int start = cpp*mainSimpi->getID();
+    int end = start + cpp;
 
-    //Solve UX = Z
-    (*upper).backward_substitution(z_col, soln_col);
+    // Initialize necessary arrays for future calculations
+    // Each array is local to its own process
+    float identityCol[getX()];
+    float zCol[getX()];
+    float solutionCol[getX()];
 
-    //Input X column to corresponding columnn in final inverse Matrix
-    for (int c = 0; c<get_x(); c++) {
-      inv->get(c,a) = soln_col[c];
-    }
-  }
-
-  // Calculate and execute which processes take the leftover rows 
-  // ex. with 3 processes and a 10x10 Matrix:
-  // 0-3 is process 0
-  // 3-6 is process 1
-  // 6-9 is process 2
-  // 9 is the leftover column that is taken by process 0
-  int parID = main_simpi->getID();
-  if (get_x()% processCount != 0) {
-    int leftover = get_x() % processCount;
-    if (parID < leftover) {
-      parID += (get_x()-leftover);
-      int start = parID;
-      int end = start + 1;
-      for (int a = start; a<end; a++) {
+    for (int a = start; a<end; a++) 
+    {
         //Get individual columns of identity Matrix
-        for (int b = 0; b<get_x(); b++) {
-          identity_col[b] = identity->get(b,a);
-        }
-
+        for (int b = 0; b < getX(); b++)         
+            identityCol[b] = identity->get(b,a);
+        
         //Reset Z column to solve for again
-        for (int d = 0; d<get_x(); d++) {
-          z_col[d] = 0;
-        }
-      
+        for (int d = 0; d<getX(); d++)
+            zCol[d] = 0;
+        
         //Solve LZ = I
-        (*lower).forward_substitution(identity_col, z_col);
+        lower->forwardSubstitution(identityCol, zCol);
 
         //Reset X column to solve for again
-        for (int d = 0; d<get_x(); d++) {
-          soln_col[d] = 0;
-        }
+        for (int d = 0; d < getX(); d++)
+            solutionCol[d] = 0;
 
         //Solve UX = Z
-        (*upper).backward_substitution(z_col, soln_col);
+        upper->backwardSubstitution(zCol, solutionCol);
 
         //Input X column to corresponding columnn in final inverse Matrix
-        for (int c = 0; c<get_x(); c++) {
-          inv->get(c,a) = soln_col[c];
-        }
-      }
+        for (int c = 0; c < getX(); c++)
+            inv->get(c,a) = solutionCol[c];
     }
-  }  
 
-  main_simpi->synch();
-  return;
+    // Calculate and execute which processes take the leftover rows 
+    // ex. with 3 processes and a 10x10 Matrix:
+    // 0-3 is process 0
+    // 3-6 is process 1
+    // 6-9 is process 2
+    // 9 is the leftover column that is taken by process 0
+    int processID = mainSimpi->getID();
+    if (getX() % processCount != 0) 
+    {
+        int leftover = getX() % processCount;
+        if (processID < leftover) 
+        {
+            processID += (getX() - leftover);
+            int start = processID;
+            int end = start + 1;
+            for (int a = start; a < end; a++) 
+            {
+                //Get individual columns of identity Matrix
+                for (int b = 0; b < getX(); b++)
+                    identityCol[b] = identity->get(b, a);
+                
+                //Reset Z column to solve for again
+                for (int d = 0; d < getX(); d++) 
+                    zCol[d] = 0;
+                
+                //Solve LZ = I
+                lower->forwardSubstitution(identityCol, zCol);
+
+                //Reset X column to solve for again
+                for (int d = 0; d < getX(); d++)
+                    solutionCol[d] = 0;
+                
+                //Solve UX = Z
+                upper->backwardSubstitution(zCol, solutionCol);
+
+                //Input X column to corresponding columnn in final inverse Matrix
+                for (int c = 0; c < getX(); c++) 
+                    inv->get(c, a) = solutionCol[c];
+                
+            }
+        }
+    }  
+
+    mainSimpi->synch();
+    return;
 }
 
 /*
 This is a helper function to calculate the solutions of a lower triangular Matrix
 */
-void Matrix::forward_substitution(float *b, float* x)
+void Matrix::forwardSubstitution(float *b, float* x)
 {
     double suma;
-    for(int i=0; i < get_x(); i=i+1)
+    for(int i = 0; i < getX(); i = i + 1)
     {
         suma = 0;
-        for(int j=0;j<i;j=j+1)
-            suma = suma+ get(i,j) * x[j];
+        for(int j = 0; j < i; j = j + 1)
+            suma = suma + get(i,j) * x[j];
 
-        x[i] = (b[i]-suma)/get(i,i);
+        x[i] = (b[i] - suma) / get(i, i);
     }
 }
 
 /*
 This is a helper function to calculate the solutions of an upper triangular Matrix
 */
-void Matrix::backward_substitution(float* b, float* x)
+void Matrix::backwardSubstitution(float* b, float* x)
 {
     double suma;
-    for(int i= get_x()-1; i>=0; i=i-1)
+    for(int i = getX() - 1; i >= 0; i = i - 1)
     {
         suma=0;
-        for(int j = get_x() - 1; j > i; j =j-1)
-            suma = suma + get(i,j) * x[j];
+        for(int j = getX() - 1; j > i; j = j - 1)
+            suma = suma + get(i, j) * x[j];
  
-        x[i]=(b[i] - suma)/get(i,i);
+        x[i] = (b[i] - suma) / get(i, i);
     }
 }
 
@@ -410,12 +417,12 @@ void->void
 
 void Matrix::jacobi(Matrix::Vector* constants, Matrix::Vector* solution) {
 
-    int processCount = main_simpi->getProcessCount();
-    int id = main_simpi->getID();
+    int processCount = mainSimpi->getProcessCount();
+    int id = mainSimpi->getID();
 
     Matrix::Vector *prev = new Matrix::Vector(constants->getSize()); // shared mem containing a copy of values
 
-    Matrix* saveEq = new Matrix(get_x(), get_y() + 1); // save equations from modification
+    Matrix* saveEq = new Matrix(getX(), getY() + 1); // save equations from modification
     Matrix::Vector* saveConst = new Matrix::Vector(constants->getSize()); // saves input vector
 
 
@@ -425,55 +432,60 @@ void Matrix::jacobi(Matrix::Vector* constants, Matrix::Vector* solution) {
     int start = id * work;
     int end = start + work;
 
-    main_simpi->synch();
+    mainSimpi->synch();
 
     //Save Matrix and Vector
-    for (i = start; i < end; i++) {
-        for (j = 0; j < get_y(); j++) {
+    for (i = start; i < end; i++) 
+    {
+        for (j = 0; j < getY(); j++) 
             saveEq->get(i,j) = get(i, j);
-        }
-        saveEq->get(i,get_y() + 1) = constants->getRef(i);
+
+        saveEq->get(i,getY() + 1) = constants->getRef(i);
         saveConst->getRef(i) = constants->getRef(i);
     }
 
     //synch, wait for all process before solving
-    main_simpi->synch();
+    mainSimpi->synch();
 
     //setup, switch var coefficient with row solution, and divide by coefficient
-    for (i = start; i < end; i++) {
+    for (i = start; i < end; i++) 
+    {
         double temp = get(i, i);
         get(i, i) = constants->getRef(i);
         constants->getRef(i) = temp;
-        for (j = 0; j < get_y(); j++) {
-            if (j != i) {
+        for (j = 0; j < getY(); j++) 
+        {
+            if (j != i)
                 get(i, j) *= -1;
-            }
+    
             get(i, j) /= constants->getRef(i);
-            //main_simpi->synch();
+            //mainSimpi->synch();
         }
         prev->getRef(i) = 1.0;
         solution->getRef(i) = constants->getRef(i);
-        main_simpi->synch();
+        mainSimpi->synch();
     }
 
-    main_simpi->synch();
+    mainSimpi->synch();
     // first iteration by trying substituting 1
-    for (i = start; i < end; i++) {
+    for (i = start; i < end; i++) 
+    {
         double rowSum = 0;
-        for (j = 0; j < get_y(); j++) {
-            if (j == i) {
+        for (j = 0; j < getY(); j++) 
+        {
+            if (j == i)
                 rowSum += get(i, j);
-            } else {
+            else
                 rowSum += (get(i, j) * prev->getRef(j));
-            }
-            //main_simpi->synch();
+            
+            //mainSimpi->synch();
         }
         solution->getRef(i) = rowSum;
-        main_simpi->synch();
+        mainSimpi->synch();
     }
 
     //wait for all processes before repeating iterations with calculated results
-    //main_simpi->synch();
+    //mainSimpi->synch();
 
     for (k = 0; k < 1000; k++)
     {
@@ -481,12 +493,12 @@ void Matrix::jacobi(Matrix::Vector* constants, Matrix::Vector* solution) {
         {
             //save prev value for comparision
             prev->getRef(i) = solution->getRef(i);
-            main_simpi->synch();
+            mainSimpi->synch();
         }
         for (i = start; i < end; i++)
         {
             double rowSum = 0;
-            for (j = 0; j < get_y(); j++)
+            for (j = 0; j < getY(); j++)
             {
                 if (j == i) {
                     rowSum += get(i, j);
@@ -495,21 +507,22 @@ void Matrix::jacobi(Matrix::Vector* constants, Matrix::Vector* solution) {
                 }
             }
             solution->getRef(i) = rowSum;
-            //main_simpi->synch();
+            //mainSimpi->synch();
         }
         //wait at end of each loop for all processes before beginning next iteration
-        main_simpi->synch();
+        mainSimpi->synch();
     }
-    main_simpi->synch();
+    mainSimpi->synch();
     //restore original Matrix and Vector
-    for (i = start; i < end; i++) {
-        for (j = 0; j < get_y(); j++) {
+    for (i = start; i < end; i++) 
+    {
+        for (j = 0; j < getY(); j++) 
             get(i, j) = saveEq->get(i,j);
-        }
+        
         constants->getRef(i) = saveConst->getRef(i);
     }
     //wait for all processes before returning solution Vector
-    main_simpi->synch();
+    mainSimpi->synch();
     //return solution;
     return;
 }
@@ -522,25 +535,15 @@ none->bool
 */
 bool Matrix::isDiagonallyDominant()
 {
-    for(int i = 0; i < get_x(); i ++)
+    for(int i = 0; i < getX(); i ++)
     {
         double sq;
         double rest = 0;
-        for(int j = 0; j < get_y(); j++)
-        {
-            if(i==j)
-            {
-                sq = get(i,j);
-            }
-            else
-            {
-                rest+=get(i,j);
-            }
-        }
+        for(int j = 0; j < getY(); j++)
+            (i == j) ? sq = get(i, j) : rest += get(i,j);
+        
         if (sq < rest)
-        {
             return false;
-        }
     }
     return true;
 }
@@ -556,20 +559,20 @@ void -> void
 void Matrix::solveSystem(Matrix::Vector *constants, Matrix::Vector* solution)
 {
     bool dd = isDiagonallyDominant();
-    main_simpi->synch();
+    mainSimpi->synch();
     if (dd)
     {
-        if (main_simpi->getID() == 0) { std::cout << "jacobi" << std::endl; }
-        main_simpi->synch();
+        if (mainSimpi->getID() == 0) { std::cout << "jacobi" << std::endl; }
+        mainSimpi->synch();
         jacobi(constants, solution);
     }
     else
     {
-        if (main_simpi->getID() == 0) { std::cout << "failsafe" << std::endl; }        
-        main_simpi->synch();
+        if (mainSimpi->getID() == 0) { std::cout << "failsafe" << std::endl; }        
+        mainSimpi->synch();
         failSafe(constants, solution);
     }
-    main_simpi->synch();
+    mainSimpi->synch();
 }
 
 /*
@@ -579,13 +582,13 @@ void->void
 */
 void Matrix::failSafe(Matrix::Vector* constants, Matrix::Vector* solution)
 {
-    Matrix* inv = new Matrix(get_x(), get_y());
+    Matrix* inv = new Matrix(getX(), getY());
     inverse(inv);
     std::cout << "inverse calculated" << std::endl;
-    main_simpi->synch();
+    mainSimpi->synch();
 
-    int processCount = main_simpi->getProcessCount();
-    int id = main_simpi->getID();
+    int processCount = mainSimpi->getProcessCount();
+    int id = mainSimpi->getID();
     int work = constants->getSize() / processCount;
 
     int start = id * work;
@@ -602,22 +605,23 @@ void Matrix::failSafe(Matrix::Vector* constants, Matrix::Vector* solution)
         }
         solution->getRef(i) = sol;
     }
-    main_simpi->synch();
+    mainSimpi->synch();
     return;
 }
 
 Matrix::Vector::Vector(int a)
 {
-  // use simp and init the Matrix for all processes. The id is also in simp
-  std::pair<std::string, double*> pass_back(Matrix::main_simpi->create_matrix(1, a));
-  unique_id = pass_back.first;
-  arr = pass_back.second;
-  dim = a;
+    // use simp and init the Matrix for all processes. The id is also in simp
+    std::pair<std::string, double*> passBack(Matrix::mainSimpi->createMatrix(1, a));
+    uniqueID = passBack.first;
+    arr = passBack.second;
+    dim = a;
 }
+
 Matrix::Vector::~Vector() 
 {
-  // use main_simpi for getting rid of the mem and unlink stuff
-  Matrix::main_simpi->free_matrix(unique_id);
+    // use mainSimpi for getting rid of the mem and unlink stuff
+    Matrix::mainSimpi->freeMatrix(uniqueID);
 }
 
 std::ostream& operator<<(std::ostream& out, const Matrix::Vector& v)

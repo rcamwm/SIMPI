@@ -17,40 +17,42 @@
 #define SYNCH_OBJECT_MEM_NAME "/simpi_shared_mem"
 #define UNIQUE_ID_SIZE 23
 
-typedef struct MatrixMetadata {
-    char unique_id[UNIQUE_ID_SIZE];
-    int file_descriptor;
+typedef struct MatrixMetadata 
+{
+    char uniqueID[UNIQUE_ID_SIZE];
+    int fileDescriptor;
     size_t size;
-    double* matrix_data;
+    double* matrixData;
 } MatrixMetadata;
 
-typedef struct SynchObject {
+typedef struct SynchObject 
+{
     int processCount;
-    char last_matrix_id[UNIQUE_ID_SIZE];
+    char lastMatrixID[UNIQUE_ID_SIZE];
     int ready[];
 } SynchObject;
 
-class Simpi {
+class Simpi 
+{
     public:
         Simpi(int _id, int _processCount);
         ~Simpi();
         int getID() { return id; }
         int getProcessCount() { return processCount; }
-        SynchObject* get_synch_info() { return synch_info; }
+        SynchObject* getSynchInfo() { return synchInfo; }
 
-        std::pair<std::string, double*> create_matrix(int x, int y);
+        std::pair<std::string, double*> createMatrix(int x, int y);
 
-        void free_matrix(std::string unique_id);
+        void freeMatrix(std::string uniqueID);
         void synch();
 
     private:
         int id;
         int processCount;
         int shm_fd;
-        SynchObject* synch_info;
-        std::map<std::string, MatrixMetadata> matrix_info;
-        std::string sync_shared_mem_name;
-        std::string get_shared_mem_name();
+        SynchObject* synchInfo;
+        std::map<std::string, MatrixMetadata> matrixInfo;
+        std::string getSharedMemName();
 };
 
 #endif
