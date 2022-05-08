@@ -269,7 +269,7 @@ namespace SimpiNS
         //Check if Matrix is square
         if (getX() != getY()) 
         {
-            std::cout << "Invalid Matrix";
+            std::cout << "Invalid Matrix: Must be square matrix" << std::endl;
             exit(1);
         }
 
@@ -409,6 +409,32 @@ namespace SimpiNS
     
             x[i] = (b[i] - suma) / get(i, i);
         }
+    }
+
+    /*
+    Solves a linear system of equations
+    If the Matrix is diagonally dominant, jacobi-iterative method is used
+    else, the inverse mutliplication method is used
+    takes in a Vector of constants that each row is to be solved for and a solution Vector of 0s in which the solution will be written in
+    void -> void
+    */
+    void Matrix::solveSystem(Vector *constants, Vector* solution)
+    {
+        bool dd = isDiagonallyDominant(); 
+        mainSimpi->synch();
+        if (dd)
+        {
+            if (mainSimpi->getID() == 0) { std::cout << "jacobi" << std::endl; }
+            mainSimpi->synch();
+            jacobi(constants, solution);
+        }
+        else
+        {
+            if (mainSimpi->getID() == 0) { std::cout << "failsafe" << std::endl; }        
+            mainSimpi->synch();
+            failSafe(constants, solution);
+        }
+        mainSimpi->synch();
     }
 
     /*
@@ -574,6 +600,7 @@ namespace SimpiNS
     {
         if (getX() != getY()) // Only square matrices can be diagonally dominant
             return false;
+
         for(int i = 0; i < getX(); i ++)
         {
             double sq;
@@ -585,33 +612,6 @@ namespace SimpiNS
                 return false;
         }
         return true;
-    }
-
-
-    /*
-    Solves a linear system of equations
-    If the Matrix is diagonally dominant, jacobi-iterative method is used
-    else, the inverse mutliplication method is used
-    takes in a Vector of constants that each row is to be solved for and a solution Vector of 0s in which the solution will be written in
-    void -> void
-    */
-    void Matrix::solveSystem(Vector *constants, Vector* solution)
-    {
-        bool dd = isDiagonallyDominant(); 
-        mainSimpi->synch();
-        if (dd)
-        {
-            if (mainSimpi->getID() == 0) { std::cout << "jacobi" << std::endl; }
-            mainSimpi->synch();
-            jacobi(constants, solution);
-        }
-        else
-        {
-            if (mainSimpi->getID() == 0) { std::cout << "failsafe" << std::endl; }        
-            mainSimpi->synch();
-            failSafe(constants, solution);
-        }
-        mainSimpi->synch();
     }
 
     /*
@@ -627,17 +627,25 @@ namespace SimpiNS
 
         int processCount = mainSimpi->getProcessCount();
         int id = mainSimpi->getID();
-        int work = constants->getSize() / processCount;
-
-        int start = id * work;
-        int end = start + work;
-        int n = constants->getSize();
+        
+        int vectorSize = constants->getSize();
+        int work = vectorSize / processCount; 
+        int start = 0;
+        int end = 0;
+        if (id < processCount) // Extra processes get no work => start and end stay at 0
+        {
+            start = id * work;
+            end = start + work;
+        }
+        int remainingWork = constants->getSize() % processCount;
+        if (id == processCount - 1) // Last active process gets all remaining work
+            end += remainingWork;
         
         double sol;
         for(int i = start; i < end; i++)
         {
             sol = 0;
-            for(int j = 0; j < n; j++)
+            for(int j = 0; j < vectorSize; j++)
             {
                 sol += (inv->get(i, j)*constants->getRef(j));
             }

@@ -3,7 +3,6 @@
 
 #include "Simpi.h"
 #include "Vector.h"
-//#include "Vector.h"
 
 namespace SimpiNS
 {
