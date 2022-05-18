@@ -4,15 +4,18 @@
 #include "Simpi.h"
 #include "Matrix.h"
 #include "Vector.h"
-#define MATRIX_DIMENSION_X 5
-#define MATRIX_DIMENSION_Y 5
+#define MATRIX_DIMENSION_X 4
+#define MATRIX_DIMENSION_Y 4
 using namespace SimpiNS;
 
 int processID;
+Simpi *mainSimpi;
 
-void testInverse(Simpi *mainSimpi);
-void testSolveSystemJacobi(Simpi *mainSimpi); // must be 3x3
-void testSolveSystemInverse(Simpi *mainSimpi); // must be 3x3
+void testDeterminant();
+void testAdjoint();
+void testInverse();
+void testSolveSystemJacobi(); 
+void testSolveSystemInverse();
 
 /*
     userDefinedActivity() is to be filled in by the user of this program.
@@ -20,14 +23,48 @@ void testSolveSystemInverse(Simpi *mainSimpi); // must be 3x3
     Can use Matrix and Vector objects here and perform operations with them.
     Use mainSimpi->synch() to synchronize processes.
 */
-void userDefinedActivity(Simpi *mainSimpi) 
+void userDefinedActivity() 
 {
-    //testInverse(mainSimpi);
-    //testSolveSystemJacobi(mainSimpi);
-    testSolveSystemInverse(mainSimpi);
+    //testDeterminant();
+    testAdjoint();
+    //testInverse();
+    //testSolveSystemJacobi();
+    //testSolveSystemInverse();
 }
 
-void testSolveSystemJacobi(Simpi *mainSimpi)
+void testDeterminant()
+{
+    Matrix A(MATRIX_DIMENSION_X, MATRIX_DIMENSION_Y);
+    for (int y = 0; y < MATRIX_DIMENSION_Y; y++)
+    {
+        for (int x = 0; x < MATRIX_DIMENSION_X; x++)
+        {
+            A.get(x, y) = rand() % 10 + 1;
+        }
+    }
+    std::cout << A << "Determinant: " << A.determinant() << std::endl;
+}
+
+void testAdjoint()
+{
+    Matrix A(MATRIX_DIMENSION_X, MATRIX_DIMENSION_Y);
+    Matrix adj(MATRIX_DIMENSION_X, MATRIX_DIMENSION_Y);
+    mainSimpi->synch();
+
+    for (int y = 0; y < MATRIX_DIMENSION_Y; y++)
+    {
+        for (int x = 0; x < MATRIX_DIMENSION_X; x++)
+        {
+            A.get(x, y) = rand() % 10 + 1;
+        }
+    }
+
+    mainSimpi->synch();
+    A.adjoint(&adj);
+    if (mainSimpi->getID() == 0) { std::cout << "\nA = " << A << "\nadj(A) = " << adj << std::endl; }
+}
+
+void testSolveSystemJacobi()
 {
     Matrix A(MATRIX_DIMENSION_X, MATRIX_DIMENSION_Y);
     Vector B(MATRIX_DIMENSION_Y);
@@ -61,7 +98,7 @@ void testSolveSystemJacobi(Simpi *mainSimpi)
     if (mainSimpi->getID() == 0) { std::cout << A << "times\n" << C << "equals\n" << B; }
 }
 
-void testSolveSystemInverse(Simpi *mainSimpi)
+void testSolveSystemInverse()
 {
     Matrix A(MATRIX_DIMENSION_X, MATRIX_DIMENSION_Y);
     Vector B(MATRIX_DIMENSION_Y);
@@ -96,7 +133,7 @@ void testSolveSystemInverse(Simpi *mainSimpi)
     
 }
 
-void testInverse(Simpi *mainSimpi)
+void testInverse()
 {
     Matrix A(MATRIX_DIMENSION_X, MATRIX_DIMENSION_Y);
     Matrix C(MATRIX_DIMENSION_X, MATRIX_DIMENSION_Y);
@@ -128,10 +165,11 @@ void segfault_printer(int dummy)
 int main(int argc, char* argv[])
 {
     signal(SIGSEGV, segfault_printer);
-    processID = atoi(argv[1]); // Global
-    Simpi *mainSimpi = new Simpi(processID, atoi(argv[2])); // argv[2]: # of processes being used
+    processID = atoi(argv[1]);
+    mainSimpi = new Simpi(processID, atoi(argv[2])); // argv[2]: # of processes being used
     Matrix::setSimpi(mainSimpi);
     Vector::setSimpi(mainSimpi);
-    userDefinedActivity(mainSimpi);
+    userDefinedActivity();
+    delete mainSimpi;
 }
 

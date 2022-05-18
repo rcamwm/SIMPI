@@ -14,6 +14,14 @@ namespace SimpiNS
             std::string uniqueID;
             static Simpi* mainSimpi;
 
+            void initializeArrayToZero(double *A, int size);
+
+            // determinate() and adjoint() helper functions
+            int calculateDeterminant(double* A, int n, int order);
+            void allocateAdjointWork(double* A, double* adj, int order);
+            void calculateAdjoint(double* A, double* adj, int order, int start, int end);
+            void calculateMinor(double* currentArray, double* minorArray, int i, int j, int n, int order);
+
             // jacobi() helper functions
             void jacobiSaveInputs(int start, int end, Matrix* saveEq, Vector* constants, Vector* saveConst);
             void jacobiSwitchAndDivide(int start, int end, Vector* constants, Vector* solution, Vector *prev, int synchOffset);
@@ -31,14 +39,12 @@ namespace SimpiNS
             int getX() { return xdim; }
             int getY() { return ydim; }
             double& get(int x, int y) { return arr[x + y * xdim]; }
-            double getAlgbera(int pos) { return arr[pos]; }
-            void set(int pos, int val) { arr[pos] = val; }
+            bool isSquareMatrix() { return getX() == getY(); }
 
-            int determinant(double* A, int n, int order);
-            void adjoint(double* A, double* adj, int order, int processID, int processCount);
-            void getCofactor(double* A, double* temp, int p, int q, int n, int order);
+            int determinant();
+            void adjoint(Matrix* adj);
             
-            void inverse(Matrix* inverse);
+            void inverse(Matrix* inv);
             void luDecomposition(Matrix* lower, Matrix* upper);
             void backwardSubstitution(float* b, float* x);
             void forwardSubstitution(float *b, float* x); 

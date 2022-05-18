@@ -38,39 +38,100 @@ namespace SimpiNS
         return out;
     }
 
-    /*
-    This is a helper function to calculate the determinant of a Matrix
-    */
-    int Matrix::determinant(double* A, int n, int order)
+    int Matrix::determinant()
     {
-        int D = 0;  // Initialize result
+        if (!isSquareMatrix()) 
+        {
+            std::cout << "Invalid Matrix: Must be square matrix" << std::endl;
+            exit(1);
+        }
+        return calculateDeterminant(this->arr, getX(), getY());
+    }
 
-        //  Base case : if Matrix contains single element
-        if (n == 1)
+   /**
+    * Helper function to calculate the determinant of a Matrix.
+    * Initially called using this->arr.
+    * Computes by recursively calling itself to find minors and calculate cofactors
+    * using calculateMinor()
+    * 
+    * @param A Array Matrix values whose determinant is being evaluated
+    * @param n Order of A 
+    * @param order Order of *this Matrix
+    * @return Matrix's determinant
+    * */
+    int Matrix::calculateDeterminant(double* A, int n, int order)
+    {
+        if (n == 1) // Base case : if Matrix contains single element
             return A[0];
 
-        double temp[order * order];  // To store cofactors
+        int det = 0; // result
+        int sign = 1; // sign multiplier
+        double m[order * order]; // Array of minors
 
-        int sign = 1;  // To store sign multiplier
-
-        // Iterate for each element of first row
-        for (int f = 0; f < n; f++) 
+        // Iterate for each element of top row
+        for (int x = 0; x < n; x++) 
         {
-            // Getting Cofactor of A[0][f]
-            getCofactor(A, temp, 0, f, n, order);
-            D += sign * A[0 + f * order] * determinant(temp, n - 1, order);
+            // Getting minor of matrixArray[0][x]
+            calculateMinor(A, m, 0, x, n, order);
+            det += sign * A[0 + x * order] * calculateDeterminant(m, n - 1, order);
 
             // terms are to be added with alternate sign
             sign = -sign;
         }
-
-        return D;
+        return det;
     }
 
-    /*
-    This is a helper function to calculate the adjoint of a Matrix
-    */
-    void Matrix::adjoint(double* A, double* adj, int order, int processID, int processCount)
+    void Matrix::adjoint(Matrix *adj)
+    {
+        if (!isSquareMatrix() || !adj->isSquareMatrix() || getX() != adj->getX()) 
+        {
+            std::cout << "Invalid Matrices: Must be equal sized square matrices" << std::endl;
+            exit(1);
+        }
+        allocateAdjointWork(this->arr, adj->arr, getX());
+        mainSimpi->synch();
+    }
+
+    void Matrix::allocateAdjointWork(double* A, double* adj, int order)
+    {
+        int processCount = mainSimpi->getProcessCount();
+        int processID = mainSimpi->getID();
+
+        if (order <= processCount)
+        {
+            int start = processID;
+            int end = start + 1;
+            if (processID < order)
+                calculateAdjoint(A, adj, order, start, end);
+        }
+        else 
+        {
+            int work = order / processCount;
+            int start = processID * work;
+            int end = start + work;
+            calculateAdjoint(A, adj, order, start, end);
+
+            int leftoverWork = order % processCount;
+            if (leftoverWork != 0)
+            {
+                start = (work * processCount) + processID;
+                end = start + 1;
+                if (processID < leftoverWork)
+                    calculateAdjoint(A, adj, order, start, end);
+            }         
+        }
+    }
+
+    /**
+    * Helper function to calculate the adjoint of a Matrix.
+    * 
+    * @param A Array of matrix to find the adjoint of 
+    * @param adj Array of matrix where adjoint will be stored
+    * @param order Order of matrices A and adj
+    * @param start Starting row index of A to evaluate in this process
+    * @param end Ending row index of A to evaluate in this process
+    * */
+    void Matrix::calculateAdjoint(double* A, double* adj, int order, int start, int end)
     {
         if (order == 1) 
         {
@@ -78,20 +139,16 @@ namespace SimpiNS
             return;
         }
 
-        int rpp = order / processCount;
-        int start = processID * rpp;
-        int end = start + rpp;
-
-        // temp is used to store cofactors of A[][]
+        // m is used to store minors of A[][]
         int sign = 1;
-        double temp[order * order];
+        double m[order * order];
 
         for (int i = 0; i < order; i++) 
         {
             for (int j = start; j < end; j++) 
             {
-                // Get cofactor of A[i][j]
-                getCofactor(A, temp, i, j, order, order);
+                // Get minor of A[i][j]
+                calculateMinor(A, m, i, j, order, order);
 
                 // sign of adj[j][i] positive if sum of row
                 // and column indexes is even.
@@ -99,35 +156,43 @@ namespace SimpiNS
 
                 // Interchanging rows and columns to get the
                 // transpose of the cofactor Matrix
-                adj[j + i * order] = (sign) * (determinant(temp, order - 1, order));
+                adj[j + i * order] = (sign) * (calculateDeterminant(m, order - 1, order));
             }
         }
     }
 
-    /*
-    This is a helper function to calculate the cofactor of a Matrix
-    */
-    void Matrix::getCofactor(double* A, double* temp, int p, int q, int n, int order)
+    /**
+    * Helper function to calculate the minor of a Matrix.
+    * 
+    * @param A Array of matrix to find the minor of 
+    * @param m Array where matrix elements of the minor are placed into
+    * @param i The column in currentArray to find the minor of; Range: (0, ..., n)
+    * @param j The row in currentArray to find the minor of; Range: (0, ..., n)
+    * @param n The order of the elements in A that are being considered (if n < order, elements of higher order are 0)
+    * @param order Matrix's total order
+    * */
+    void Matrix::calculateMinor(double* A, double* m, int i, int j, int n, int order)
     {
-        int i = 0, j = 0;
+        int mRow = 0; // row of m array
+        int mCol= 0; // column of m array
 
         // Looping for each element of the Matrix
         for (int row = 0; row < n; row++) 
         {
             for (int col = 0; col < n; col++) 
             {
-                //  Copying into temporary Matrix only those element
+                //  Copying into temporary array only those element
                 //  which are not in given row and column
-                if (row != p && col != q) 
+                if (row != i && col != j) 
                 {
-                    temp[(i) + (j++) * order] = A[row + col * order];
+                    m[(mRow) + (mCol++) * order] = A[row + col * order];
 
                     // Row is filled, so increase row index and
                     // reset col index
-                    if (j == n - 1) 
+                    if (mCol == n - 1) 
                     {
-                        j = 0;
-                        i++;
+                        mCol = 0;
+                        mRow++;
                     }
                 }
             }
@@ -141,8 +206,7 @@ namespace SimpiNS
     */
     void Matrix::luDecomposition(Matrix* lower, Matrix* upper) {
 
-        // Check if Matrix is square
-        if (getX() != getY()) 
+        if (!isSquareMatrix()) 
         {
             std::cout << "Invalid Matrix";
             exit(1);
@@ -266,10 +330,9 @@ namespace SimpiNS
     */
     void Matrix::inverse(Matrix* inv) 
     {
-        //Check if Matrix is square
-        if (getX() != getY()) 
+        if (!isSquareMatrix() || !inv->isSquareMatrix() || getX() != inv->getX()) 
         {
-            std::cout << "Invalid Matrix: Must be square matrix" << std::endl;
+            std::cout << "Invalid Matrices: Must be equal sized square matrices" << std::endl;
             exit(1);
         }
 
@@ -592,29 +655,6 @@ namespace SimpiNS
     }
 
     /*
-    Checks if a square Matrix is diagonally dominant
-    (diagonal terms are greater-than or equal to sum of the rest of their row)
-    none->bool
-    */
-    bool Matrix::isDiagonallyDominant()
-    {
-        if (getX() != getY()) // Only square matrices can be diagonally dominant
-            return false;
-
-        for(int i = 0; i < getX(); i ++)
-        {
-            double sq;
-            double rest = 0;
-            for(int j = 0; j < getY(); j++)
-                (i == j) ? sq = get(i, j) : rest += get(i,j);
-            
-            if (sq < rest)
-                return false;
-        }
-        return true;
-    }
-
-    /*
     Method to solve a system of linear equations if the system is not diagonally dominant
     Uses the inverse-mutliplication method. 
     void->void
@@ -654,4 +694,34 @@ namespace SimpiNS
         mainSimpi->synch();
         return;
     }
+
+    /*
+    Checks if a square Matrix is diagonally dominant
+    (diagonal terms are greater-than or equal to sum of the rest of their row)
+    none->bool
+    */
+    bool Matrix::isDiagonallyDominant()
+    {
+        if (!isSquareMatrix())
+            return false;
+
+        for(int i = 0; i < getX(); i ++)
+        {
+            double sq;
+            double rest = 0;
+            for(int j = 0; j < getY(); j++)
+                (i == j) ? sq = get(i, j) : rest += get(i,j);
+            
+            if (sq < rest)
+                return false;
+        }
+        return true;
+    }
+
+    void Matrix::initializeArrayToZero(double *A, int size)
+    {
+        for (int i = 0; i < size; i++)
+            A[i] = 0;
+    }
+
 }
