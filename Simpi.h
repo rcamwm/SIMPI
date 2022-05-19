@@ -43,7 +43,7 @@ namespace SimpiNS
             int getProcessCount() { return processCount; }
             SynchObject* getSynchInfo() { return synchInfo; }
 
-            std::pair<std::string, double*> createMatrix(int x, int y);
+            std::pair<std::string, double*> createMatrix(int rows, int cols);
 
             void freeMatrix(std::string uniqueID);
             void synch();

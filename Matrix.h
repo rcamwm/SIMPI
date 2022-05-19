@@ -9,12 +9,15 @@ namespace SimpiNS
     class Matrix
     {
         private:
-            int xdim, ydim;
+            int rows, cols;
             double* arr;
             std::string uniqueID;
             static Simpi* mainSimpi;
 
             void initializeArrayToZero(double *A, int size);
+
+            // multiply() helper function
+            void calculateProduct(Matrix &B, Matrix* C, int start, int end, bool rowGreaterThanCol);
 
             // determinate() and adjoint() helper functions
             int calculateDeterminant(double* A, int n, int order);
@@ -32,14 +35,14 @@ namespace SimpiNS
         public:
             static void setSimpi(Simpi *s) { mainSimpi = s; }
 
-            Matrix(int x, int y);
+            Matrix(int rowCount, int colCount);
             ~Matrix();
 
             int getSimpiID() const { return mainSimpi->getID(); }
-            int getX() { return xdim; }
-            int getY() { return ydim; }
-            double& get(int x, int y) { return arr[x + y * xdim]; }
-            bool isSquareMatrix() { return getX() == getY(); }
+            int getRows() { return rows; }
+            int getCols() { return cols; }
+            double& get(int row, int col) { return arr[row + (col * rows)]; }
+            bool isSquareMatrix() { return rows == cols; }
 
             int determinant();
             void adjoint(Matrix* adj);
@@ -50,12 +53,30 @@ namespace SimpiNS
             void forwardSubstitution(float *b, float* x); 
 
             void solveSystem(Vector* constants, Vector* solution);
-            void jacobi(Vector* constants, Vector* solution);
+            void jacobi(Vector* constants, Vector* solution); // TODO: fix, synch() getting stuck in jacobiRemainingIterations()
             void failSafe(Vector* constants, Vector* solution);
             bool isDiagonallyDominant();
 
-            friend std::ostream& operator<<(std::ostream& out, const Matrix& m);      
-            // overload +, -, *, /, ..... 
+            friend std::ostream& operator<<(std::ostream& out, const Matrix& m);
+
+            // TODO
+            Matrix &multiply(Matrix &operand);
+            friend Matrix &operator*(Matrix &lhs, Matrix &rhs);
+            friend void operator*=(Matrix &lhs, Matrix &rhs);
+            
+            friend Matrix &operator*(int lhs, Matrix &rhs);
+            friend Matrix &operator*(Matrix &lhs, int rhs);
+            friend void operator*=(Matrix &lhs, int rhs);
+
+            friend Matrix &operator+(Matrix &lhs, Matrix &rhs);
+            friend void operator+=(Matrix &lhs, Matrix &rhs);
+            
+            friend Matrix &operator-(Matrix &lhs, Matrix &rhs);
+            friend void operator-=(Matrix &lhs, Matrix &rhs);
+            
+            
+            friend bool operator==(Matrix &lhs, Matrix &rhs);
+            friend bool operator!=(Matrix &lhs, Matrix &rhs);   
     };
 }
 #endif

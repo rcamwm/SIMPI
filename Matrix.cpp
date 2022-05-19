@@ -5,37 +5,19 @@ namespace SimpiNS
     // Must be set before any Matrix objects are created
     Simpi* Matrix::mainSimpi;
 
-    Matrix::Matrix(int x, int y)
+    Matrix::Matrix(int rowCount, int colCount)
     {
         // use mainSimpi to init the Matrix for all processes. The id is also in simp
-        std::pair<std::string, double*> passBack(mainSimpi->createMatrix(x, y));
+        std::pair<std::string, double*> passBack(mainSimpi->createMatrix(rowCount, colCount));
         uniqueID = passBack.first;
         arr = passBack.second;
-        xdim = x;
-        ydim = y;
+        rows = rowCount;
+        cols = colCount;
     }
 
     Matrix::~Matrix()
     {
         mainSimpi->freeMatrix(uniqueID); // frees and unlinks memory
-    }
-
-    std::ostream& operator<<(std::ostream& out, const Matrix& m)
-    {
-        if (m.getSimpiID() == 0)
-        {
-            for (int i = 0; i < m.xdim; i++)
-            {
-                out << std::endl;
-                for (int j = 0; j < m.ydim; j++)
-                {
-                    out << std::fixed << std::setprecision(2) << m.arr[i + j * m.xdim];
-                    out << ", ";
-                }
-            }
-            out << std::endl;
-        }
-        return out;
     }
 
     int Matrix::determinant()
@@ -45,7 +27,7 @@ namespace SimpiNS
             std::cout << "Invalid Matrix: Must be square matrix" << std::endl;
             exit(1);
         }
-        return calculateDeterminant(this->arr, getX(), getY());
+        return calculateDeterminant(this->arr, getRows(), getCols());
     }
 
    /**
@@ -83,12 +65,12 @@ namespace SimpiNS
 
     void Matrix::adjoint(Matrix *adj)
     {
-        if (!isSquareMatrix() || !adj->isSquareMatrix() || getX() != adj->getX()) 
+        if (!isSquareMatrix() || !adj->isSquareMatrix() || getRows() != adj->getRows()) 
         {
             std::cout << "Invalid Matrices: Must be equal sized square matrices" << std::endl;
             exit(1);
         }
-        allocateAdjointWork(this->arr, adj->arr, getX());
+        allocateAdjointWork(this->arr, adj->arr, getRows());
         mainSimpi->synch();
     }
 
@@ -212,13 +194,13 @@ namespace SimpiNS
             exit(1);
         }
 
-        for (int i = 0; i < getX(); i++) 
+        for (int i = 0; i < getRows(); i++) 
         {
             // Calculate work per parallel process
             // Has to be calculated on every loop iteration as the inner loop is decrementing
             int processCount = mainSimpi->getProcessCount();
             int processID = mainSimpi->getID();
-            int total = xdim - i;
+            int total = rows - i;
             if (processCount > total)
                 processCount = total;
 
@@ -229,7 +211,7 @@ namespace SimpiNS
             // Upper Triangular 
             for (int k = start; k < end; k++) 
             {
-                if (k >= getX())
+                if (k >= getRows())
                     break;
 
                 // Summation of L(i, j) * U(j, k) 
@@ -248,7 +230,7 @@ namespace SimpiNS
                 int leftover = total % processCount;
                 if (processID < leftover) 
                 {
-                    processID += (xdim - leftover);
+                    processID += (rows - leftover);
                     int start = processID;
                     int end = start + 1;
                     for (int a = start; a < end; a++) 
@@ -266,14 +248,14 @@ namespace SimpiNS
 
             mainSimpi->synch();
 
-            total = getX() - i;
+            total = getRows() - i;
             processID = mainSimpi->getID();
             processCount = mainSimpi->getProcessCount();
 
             // Lower Triangular
             for (int k = start; k < end; k++) 
             {
-                if (k >= getX())
+                if (k >= getRows())
                     break;
                 
                 if (i == k)
@@ -295,7 +277,7 @@ namespace SimpiNS
                 int leftover = total % processCount;
                 if (processID < leftover) 
                 {
-                    processID += (getX() - leftover);
+                    processID += (getRows() - leftover);
                     int start = processID;
                     int end = start + 1;
                     for (int a = start; a < end; a++) 
@@ -330,25 +312,25 @@ namespace SimpiNS
     */
     void Matrix::inverse(Matrix* inv) 
     {
-        if (!isSquareMatrix() || !inv->isSquareMatrix() || getX() != inv->getX()) 
+        if (!isSquareMatrix() || !inv->isSquareMatrix() || getRows() != inv->getRows()) 
         {
             std::cout << "Invalid Matrices: Must be equal sized square matrices" << std::endl;
             exit(1);
         }
 
         //Solve for lower and upper matrices
-        Matrix* upper = new Matrix(getX(), getY());
-        Matrix* lower = new Matrix(getX(), getY());
+        Matrix* upper = new Matrix(getRows(), getCols());
+        Matrix* lower = new Matrix(getRows(), getCols());
         luDecomposition(lower,upper);
         mainSimpi->synch();
 
         //Create Identity nxn Matrix
-        Matrix* identity = new Matrix(getX(), getY());
+        Matrix* identity = new Matrix(getRows(), getCols());
         if (mainSimpi->getID() == 0) 
         {
-            for (int i = 0; i<getX(); i++) 
+            for (int i = 0; i<getRows(); i++) 
             {
-                for (int j = 0; j<getX(); j++)            
+                for (int j = 0; j<getRows(); j++)            
                     (i == j) ? identity->get(i,j) = 1 : identity->get(i,j) = 0; 
             }
         }
@@ -357,41 +339,41 @@ namespace SimpiNS
 
         // Calculate columns per parallel process
         int processCount = mainSimpi->getProcessCount();
-        if (processCount > getX()) 
-            processCount = getX();
+        if (processCount > getRows()) 
+            processCount = getRows();
         
-        int cpp = getX() / processCount;
+        int cpp = getRows() / processCount;
         int start = cpp*mainSimpi->getID();
         int end = start + cpp;
 
         // Initialize necessary arrays for future calculations
         // Each array is local to its own process
-        float identityCol[getX()];
-        float zCol[getX()];
-        float solutionCol[getX()];
+        float identityCol[getRows()];
+        float zCol[getRows()];
+        float solutionCol[getRows()];
 
         for (int a = start; a<end; a++) 
         {
             //Get individual columns of identity Matrix
-            for (int b = 0; b < getX(); b++)         
+            for (int b = 0; b < getRows(); b++)         
                 identityCol[b] = identity->get(b,a);
             
             //Reset Z column to solve for again
-            for (int d = 0; d<getX(); d++)
+            for (int d = 0; d<getRows(); d++)
                 zCol[d] = 0;
             
             //Solve LZ = I
             lower->forwardSubstitution(identityCol, zCol);
 
             //Reset X column to solve for again
-            for (int d = 0; d < getX(); d++)
+            for (int d = 0; d < getRows(); d++)
                 solutionCol[d] = 0;
 
             //Solve UX = Z
             upper->backwardSubstitution(zCol, solutionCol);
 
             //Input X column to corresponding columnn in final inverse Matrix
-            for (int c = 0; c < getX(); c++)
+            for (int c = 0; c < getRows(); c++)
                 inv->get(c,a) = solutionCol[c];
         }
 
@@ -402,36 +384,36 @@ namespace SimpiNS
         // 6-9 is process 2
         // 9 is the leftover column that is taken by process 0
         int processID = mainSimpi->getID();
-        if (getX() % processCount != 0) 
+        if (getRows() % processCount != 0) 
         {
-            int leftover = getX() % processCount;
+            int leftover = getRows() % processCount;
             if (processID < leftover) 
             {
-                processID += (getX() - leftover);
+                processID += (getRows() - leftover);
                 int start = processID;
                 int end = start + 1;
                 for (int a = start; a < end; a++) 
                 {
                     //Get individual columns of identity Matrix
-                    for (int b = 0; b < getX(); b++)
+                    for (int b = 0; b < getRows(); b++)
                         identityCol[b] = identity->get(b, a);
                     
                     //Reset Z column to solve for again
-                    for (int d = 0; d < getX(); d++) 
+                    for (int d = 0; d < getRows(); d++) 
                         zCol[d] = 0;
                     
                     //Solve LZ = I
                     lower->forwardSubstitution(identityCol, zCol);
 
                     //Reset X column to solve for again
-                    for (int d = 0; d < getX(); d++)
+                    for (int d = 0; d < getRows(); d++)
                         solutionCol[d] = 0;
                     
                     //Solve UX = Z
                     upper->backwardSubstitution(zCol, solutionCol);
 
                     //Input X column to corresponding columnn in final inverse Matrix
-                    for (int c = 0; c < getX(); c++) 
+                    for (int c = 0; c < getRows(); c++) 
                         inv->get(c, a) = solutionCol[c];
                     
                 }
@@ -448,7 +430,7 @@ namespace SimpiNS
     void Matrix::forwardSubstitution(float *b, float* x)
     {
         double suma;
-        for(int i = 0; i < getX(); i = i + 1)
+        for(int i = 0; i < getRows(); i = i + 1)
         {
             suma = 0;
             for(int j = 0; j < i; j = j + 1)
@@ -464,10 +446,10 @@ namespace SimpiNS
     void Matrix::backwardSubstitution(float* b, float* x)
     {
         double suma;
-        for(int i = getX() - 1; i >= 0; i = i - 1)
+        for(int i = getRows() - 1; i >= 0; i = i - 1)
         {
             suma=0;
-            for(int j = getX() - 1; j > i; j = j - 1)
+            for(int j = getRows() - 1; j > i; j = j - 1)
                 suma = suma + get(i, j) * x[j];
     
             x[i] = (b[i] - suma) / get(i, i);
@@ -512,7 +494,7 @@ namespace SimpiNS
         if (processCount > constants->getSize()) 
             processCount = constants->getSize();
         
-        Matrix* saveEq = new Matrix(getX(), getY() + 1); // save equations from modification
+        Matrix* saveEq = new Matrix(getRows(), getCols() + 1); // save equations from modification
         Vector* saveConst = new Vector(constants->getSize()); // saves input vector
         Vector *prev = new Vector(constants->getSize()); // shared mem containing a copy of values
 
@@ -534,22 +516,28 @@ namespace SimpiNS
 
         jacobiSaveInputs(start, end, saveEq, constants, saveConst);
         mainSimpi->synch();
+        std::cout << id << ": saved" << std::endl;
 
         // Switches diagonals with solution elements,
         // then divides each matrix row by their original diagonal element 
         jacobiSwitchAndDivide(start, end, constants, solution, prev, synchOffset);
         mainSimpi->synch();
+        std::cout << id << ": switched and divided" << std::endl;
 
         // First iteration with substitution 1
         jacobiFirstIteration(start, end, solution, prev, synchOffset);
         mainSimpi->synch();
+        std::cout << id << ": iterated first" << std::endl;
 
         // Repeat iterations with calculated results
         jacobiRemainingIterations(start, end, solution, prev, synchOffset);
         mainSimpi->synch();
+        std::cout << id << ": iterated remaining" << std::endl;
 
         jacobiRestoreInputs(start, end, saveEq, constants, saveConst);
         mainSimpi->synch();
+        std::cout << id << ": restored" << std::endl;
+
 
         return;
     }
@@ -558,10 +546,10 @@ namespace SimpiNS
     {
         for (int i = start; i < end; i++) 
         {
-            for (int j = 0; j < getY(); j++) 
+            for (int j = 0; j < getCols(); j++) 
                 saveEq->get(i,j) = get(i, j);
 
-            saveEq->get(i,getY() + 1) = constants->getRef(i);
+            saveEq->get(i,getCols() + 1) = constants->getRef(i);
             saveConst->getRef(i) = constants->getRef(i);
         }
     }
@@ -578,7 +566,7 @@ namespace SimpiNS
             double temp = get(i, i);
             get(i, i) = constants->getRef(i);
             constants->getRef(i) = temp;
-            for (int j = 0; j < getY(); j++) 
+            for (int j = 0; j < getCols(); j++) 
             {
                 if (j != i)
                     get(i, j) *= -1;
@@ -598,7 +586,7 @@ namespace SimpiNS
         for (int i = start; i < end; i++) 
         {
             double rowSum = 0;
-            for (int j = 0; j < getY(); j++) 
+            for (int j = 0; j < getCols(); j++) 
             {
                 if (j == i)
                     rowSum += get(i, j);
@@ -627,7 +615,7 @@ namespace SimpiNS
             for (int i = start; i < end; i++)
             {
                 double rowSum = 0;
-                for (int j = 0; j < getY(); j++)
+                for (int j = 0; j < getCols(); j++)
                 {
                     if (j == i) {
                         rowSum += get(i, j);
@@ -647,7 +635,7 @@ namespace SimpiNS
     {
         for (int i = start; i < end; i++) 
         {
-            for (int j = 0; j < getY(); j++) 
+            for (int j = 0; j < getCols(); j++) 
                 get(i, j) = saveEq->get(i,j);
             
             constants->getRef(i) = saveConst->getRef(i);
@@ -661,7 +649,7 @@ namespace SimpiNS
     */
     void Matrix::failSafe(Vector* constants, Vector* solution)
     {
-        Matrix* inv = new Matrix(getX(), getY());
+        Matrix* inv = new Matrix(getRows(), getCols());
         inverse(inv);
         mainSimpi->synch();
 
@@ -705,11 +693,11 @@ namespace SimpiNS
         if (!isSquareMatrix())
             return false;
 
-        for(int i = 0; i < getX(); i ++)
+        for(int i = 0; i < getRows(); i ++)
         {
             double sq;
             double rest = 0;
-            for(int j = 0; j < getY(); j++)
+            for(int j = 0; j < getCols(); j++)
                 (i == j) ? sq = get(i, j) : rest += get(i,j);
             
             if (sq < rest)
@@ -723,5 +711,116 @@ namespace SimpiNS
         for (int i = 0; i < size; i++)
             A[i] = 0;
     }
+/*
+    AB = C
+    A = *this
+    Solves matrix multiplication in parallel and outputs the product solution
+    matrix -> matrix
+    Must manually delete returned pointer
+    */
+    
+    /**
+     * C = AB
+     * Solves matrix multiplication in parallel and outputs the product solution.
+     * 
+     * @param B matrix that this Matrix (A) is being being multiplied with.
+     *          B's row count must match this Matrix (A)'s column count.
+     * @return the matrix C, the product of this Matrix (A) and B.
+     */
+    Matrix &Matrix::multiply(Matrix &B)
+    {
+        if (cols != B.rows)
+        {
+            printf("Cannot multiply matrices of sizes %dx%d and %dx%d", rows, cols, B.rows, B.cols); 
+            exit(1);
+        }
+        Matrix *C = new Matrix(rows, B.cols);
+
+        // Processes divide the rows if C has more rows, and divide the columns if not
+        bool rowGreaterThanCol = C->rows > C->cols;
+        int div = (rowGreaterThanCol) ? C->rows : C->cols;
+
+        int processCount = mainSimpi->getProcessCount();
+        int processID = mainSimpi->getID();
+
+        if (div <= processCount)
+        {
+            int start = processID;
+            int end = start + 1;
+            if (processID < div)
+                calculateProduct(B, C, start, end, rowGreaterThanCol);
+        }
+        else 
+        {
+            int work = div / processCount;
+            int start = processID * work;
+            int end = start + work;
+            calculateProduct(B, C, start, end, rowGreaterThanCol);
+
+            int leftoverWork = div % processCount;
+            if (leftoverWork != 0)
+            {
+                start = (work * processCount) + processID;
+                end = start + 1;
+                if (processID < leftoverWork)
+                    calculateProduct(B, C, start, end, rowGreaterThanCol);
+            }         
+        }
+        mainSimpi->synch();
+        return *C;
+    }
+
+    Matrix &operator*(Matrix &lhs, Matrix &rhs)
+    {
+        return lhs.multiply(rhs);
+    }
+
+    void operator*=(Matrix &lhs, Matrix &rhs)
+    {
+        lhs = lhs.multiply(rhs);
+    }
+
+    void Matrix::calculateProduct(Matrix &B, Matrix* C, int start, int end, bool rowGreaterThanCol)
+    {
+        Matrix *A = this; // For clarity
+
+        // Processes divide the rows if C has more rows, and divide the columns if not
+        int rowStart, rowEnd, colStart, colEnd;
+        if (rowGreaterThanCol) { rowStart = start, rowEnd = end, colStart = 0, colEnd = C->cols; }
+        else { rowStart = 0, rowEnd = C->rows, colStart = start, colEnd = end; }
+
+        for (int row = rowStart; row < rowEnd; row++)
+        {
+            for (int col = colStart; col < colEnd; col++)
+            {
+                C->get(row, col) = 0;
+                for (int offset = 0; offset < B.rows; offset++) // A->col == B.rows
+                {
+                    C->get(row, col) += A->get(row, offset) * B.get(offset, col);
+                }
+            }
+        }
+    }
+
+    std::ostream& operator<<(std::ostream& out, const Matrix& m)
+    {
+        if (m.getSimpiID() == 0)
+        {
+            for (int i = 0; i < m.rows; i++)
+            {
+                out << std::endl;
+                for (int j = 0; j < m.cols; j++)
+                {
+                    out << std::fixed << std::setprecision(2) << m.arr[i + j * m.rows];
+                    out << ", ";
+                }
+            }
+            out << std::endl;
+        }
+        return out;
+    }
+
+
+
 
 }

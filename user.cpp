@@ -11,6 +11,7 @@ using namespace SimpiNS;
 int processID;
 Simpi *mainSimpi;
 
+void testMultiplication();
 void testDeterminant();
 void testAdjoint();
 void testInverse();
@@ -25,11 +26,38 @@ void testSolveSystemInverse();
 */
 void userDefinedActivity() 
 {
-    //testDeterminant();
-    testAdjoint();
-    //testInverse();
-    //testSolveSystemJacobi();
-    //testSolveSystemInverse();
+    testMultiplication();
+    // testDeterminant();
+    // testAdjoint();
+    // testInverse();
+    // testSolveSystemJacobi();
+    // testSolveSystemInverse();
+}
+
+void testMultiplication()
+{
+    Matrix A(4, 4);
+    for (int row = 0; row < A.getRows(); row++)
+    {
+        for (int col = 0; col < A.getCols(); col++)
+        {
+            A.get(row, col) = rand() % 10 + 1;
+        }
+    }
+    Matrix B(4, 4);
+    for (int row = 0; row < B.getRows(); row++)
+    {
+        for (int col = 0; col < B.getCols(); col++)
+        {
+            B.get(row, col) = rand() % 10 + 1;
+        }
+    }
+
+    Matrix C = A * B;
+    if (mainSimpi->getID() == 0) { std::cout << A << "times" << B << "equals" << C; }
+
+    A *= B;
+    if (mainSimpi->getID() == 0) { std::cout << "\nA *= B is now" << A; }
 }
 
 void testDeterminant()

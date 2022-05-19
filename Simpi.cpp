@@ -64,13 +64,13 @@ namespace SimpiNS
             synch();
     }
 
-    std::pair<std::string, double*> Simpi::createMatrix(int x, int y)
+    std::pair<std::string, double*> Simpi::createMatrix(int rows, int cols)
     {
         std::string uniqueID;
         double* matrix;
 
         int fd;
-        size_t size = x * y * sizeof(double);
+        size_t size = rows * cols * sizeof(double);
         if (id == 0) 
         {
             uniqueID = getSharedMemoryName();
