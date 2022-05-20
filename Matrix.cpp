@@ -5,6 +5,10 @@ namespace SimpiNS
     // Must be set before any Matrix objects are created
     Simpi* Matrix::mainSimpi;
 
+    // Since Matrix elements are doubles,
+    // can set precision to specific decimal place to account for potential stray bits
+    double Matrix::equalityPrecision = 0.0f;
+
     Matrix::Matrix(int rowCount, int colCount)
     {
         // use mainSimpi to init the Matrix for all processes. The id is also in simp
@@ -711,13 +715,105 @@ namespace SimpiNS
         for (int i = 0; i < size; i++)
             A[i] = 0;
     }
-/*
-    AB = C
-    A = *this
-    Solves matrix multiplication in parallel and outputs the product solution
-    matrix -> matrix
-    Must manually delete returned pointer
-    */
+
+    bool Matrix::equals(Matrix &comparand)
+    {
+        if (rows != comparand.rows || cols != comparand.cols)
+            return false;
+            
+        int fd;
+        bool *equalityBool = getSharedBool(fd); // Shared between all processes so the same value is always returned
+        *equalityBool = true;
+        mainSimpi->synch();
+
+        // Processes divide the rows if matrices have more rows, and divide the columns if not
+        bool rowGreaterThanCol = rows > cols;
+        int div = (rowGreaterThanCol) ? rows : cols;
+
+        int processCount = mainSimpi->getProcessCount();
+        int processID = mainSimpi->getID();
+
+        if (div <= processCount)
+        {
+            int start = processID;
+            int end = start + 1;
+            if (processID < div)
+                determineEquality(comparand, start, end, rowGreaterThanCol, equalityBool);
+        }
+        else 
+        {
+            int work = div / processCount;
+            int start = processID * work;
+            int end = start + work;
+            determineEquality(comparand, start, end, rowGreaterThanCol, equalityBool);
+
+            int leftoverWork = div % processCount;
+            if (leftoverWork != 0)
+            {
+                start = (work * processCount) + processID;
+                end = start + 1;
+                if (processID < leftoverWork)
+                    determineEquality(comparand, start, end, rowGreaterThanCol, equalityBool);
+            }         
+        }
+        mainSimpi->synch();
+        bool eqValue = *equalityBool;
+        
+        mainSimpi->synch();
+        close(fd);
+        shm_unlink("TEMP_SHARED_BOOL_FOR_EQUALITY_CHECK");
+        munmap(equalityBool, sizeof(bool*));
+        
+        mainSimpi->synch();
+        return eqValue;
+    }
+
+    bool operator==(Matrix &lhs, Matrix &rhs)
+    {
+        return lhs.equals(rhs);
+    }
+
+    bool operator!=(Matrix &lhs, Matrix &rhs)
+    {
+        return !lhs.equals(rhs);
+    }
+
+    bool* Matrix::getSharedBool(int &fd)
+    {
+        bool *eq;
+        if (mainSimpi->getID() == 0) 
+        {
+            fd = shm_open("TEMP_SHARED_BOOL_FOR_EQUALITY_CHECK", O_RDWR | O_CREAT, 0777); 
+            ftruncate(fd, sizeof(bool*));
+            eq = (bool*)mmap(NULL, sizeof(bool*), PROT_READ | PROT_WRITE, MAP_SHARED, fd, 0);
+            mainSimpi->synch();
+        }
+        else 
+        {
+            mainSimpi->synch();
+            fd = shm_open("TEMP_SHARED_BOOL_FOR_EQUALITY_CHECK", O_RDWR, 0777);
+            eq = (bool*)mmap(NULL, sizeof(bool*), PROT_READ | PROT_WRITE, MAP_SHARED, fd, 0);
+        }
+        return eq;
+    }
+
+    void Matrix::determineEquality(Matrix &comparand, int start, int end, bool rowGreaterThanCol, bool* eqValue)
+    {
+        int rowStart, rowEnd, colStart, colEnd;
+        if (rowGreaterThanCol) { rowStart = start, rowEnd = end, colStart = 0, colEnd = cols; }
+        else { rowStart = 0, rowEnd = rows, colStart = start, colEnd = end; }
+
+        for (int row = rowStart; row < rowEnd; row++)
+        {
+            for (int col = colStart; col < colEnd; col++)
+            {
+                if (fabs(this->get(row, col) - comparand.get(row, col)) > equalityPrecision)
+                    *eqValue = false;                    
+                if (!*eqValue)
+                    return;                
+            }
+        }
+    }
     
     /**
      * C = AB

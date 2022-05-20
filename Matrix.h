@@ -1,6 +1,7 @@
 #ifndef MATRIX_H
 #define MATRIX_H
 
+#include <math.h>
 #include "Simpi.h"
 #include "Vector.h"
 
@@ -13,11 +14,9 @@ namespace SimpiNS
             double* arr;
             std::string uniqueID;
             static Simpi* mainSimpi;
+            static double equalityPrecision;
 
             void initializeArrayToZero(double *A, int size);
-
-            // multiply() helper function
-            void calculateProduct(Matrix &B, Matrix* C, int start, int end, bool rowGreaterThanCol);
 
             // determinate() and adjoint() helper functions
             int calculateDeterminant(double* A, int n, int order);
@@ -32,8 +31,14 @@ namespace SimpiNS
             void jacobiRemainingIterations(int start, int end, Vector* solution, Vector *prev, int synchOffset);
             void jacobiRestoreInputs(int start, int end, Matrix* saveEq, Vector* constants, Vector* saveConst);
 
+            // algebra helper functions
+            void determineEquality(Matrix &comparand, int start, int end, bool rowGreaterThanCol, bool* eqValue);
+            bool *getSharedBool(int &fd);
+            void calculateProduct(Matrix &B, Matrix* C, int start, int end, bool rowGreaterThanCol);
+
         public:
             static void setSimpi(Simpi *s) { mainSimpi = s; }
+            static void setEqualityPrecision(double d) { equalityPrecision = d; }
 
             Matrix(int rowCount, int colCount);
             ~Matrix();
@@ -59,24 +64,26 @@ namespace SimpiNS
 
             friend std::ostream& operator<<(std::ostream& out, const Matrix& m);
 
-            // TODO
+            bool equals(Matrix &comparand);
+            friend bool operator==(Matrix &lhs, Matrix &rhs);
+            friend bool operator!=(Matrix &lhs, Matrix &rhs);  
+
             Matrix &multiply(Matrix &operand);
             friend Matrix &operator*(Matrix &lhs, Matrix &rhs);
             friend void operator*=(Matrix &lhs, Matrix &rhs);
             
+            Matrix &scalarMultiply(int operand); // TODO
             friend Matrix &operator*(int lhs, Matrix &rhs);
             friend Matrix &operator*(Matrix &lhs, int rhs);
             friend void operator*=(Matrix &lhs, int rhs);
 
+            Matrix &add(Matrix &operand); // TODO
             friend Matrix &operator+(Matrix &lhs, Matrix &rhs);
             friend void operator+=(Matrix &lhs, Matrix &rhs);
             
+            Matrix &subtract(Matrix &operand); // TODO
             friend Matrix &operator-(Matrix &lhs, Matrix &rhs);
-            friend void operator-=(Matrix &lhs, Matrix &rhs);
-            
-            
-            friend bool operator==(Matrix &lhs, Matrix &rhs);
-            friend bool operator!=(Matrix &lhs, Matrix &rhs);   
+            friend void operator-=(Matrix &lhs, Matrix &rhs); 
     };
 }
 #endif

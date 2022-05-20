@@ -11,6 +11,7 @@ using namespace SimpiNS;
 int processID;
 Simpi *mainSimpi;
 
+void testEquality();
 void testMultiplication();
 void testDeterminant();
 void testAdjoint();
@@ -26,12 +27,39 @@ void testSolveSystemInverse();
 */
 void userDefinedActivity() 
 {
-    testMultiplication();
+    testEquality();
+    // testMultiplication();
     // testDeterminant();
     // testAdjoint();
     // testInverse();
     // testSolveSystemJacobi();
     // testSolveSystemInverse();
+}
+
+void testEquality()
+{
+    Matrix A(4, 4);
+    Matrix B(4, 4);
+    Matrix C(4, 4);
+    for (int row = 0; row < A.getRows(); row++)
+    {
+        for (int col = 0; col < A.getCols(); col++)
+        {
+            A.get(row, col) = rand() % 10 + 1;
+            B.get(row, col) = A.get(row, col);
+            C.get(row, col) = A.get(row, col);
+        }
+    }
+    C.get(3,3) += 0.001;
+    bool AB = A == B;
+    bool AC = A == C;
+    bool AC2 = A != C;
+    if (mainSimpi->getID() == 0) { std::cout << "\n1: " << AB << "\n0: " << AC << "\n1: " << AC2 << std::endl; }
+
+    Matrix D(3, 4);
+    Matrix E(4, 4);
+    bool DE = D == E;
+    if (mainSimpi->getID() == 0) { std::cout << "0: " << DE << std::endl; }
 }
 
 void testMultiplication()
@@ -195,6 +223,7 @@ int main(int argc, char* argv[])
     signal(SIGSEGV, segfault_printer);
     processID = atoi(argv[1]);
     mainSimpi = new Simpi(processID, atoi(argv[2])); // argv[2]: # of processes being used
+    //Matrix::setEqualityPrecision(0.001f);
     Matrix::setSimpi(mainSimpi);
     Vector::setSimpi(mainSimpi);
     userDefinedActivity();
