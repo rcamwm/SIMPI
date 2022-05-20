@@ -19,7 +19,7 @@ namespace SimpiNS
             void initializeArrayToZero(double *A, int size);
 
             // determinate() and adjoint() helper functions
-            int calculateDeterminant(double* A, int n, int order);
+            double calculateDeterminant(double* A, int n, int order);
             void allocateAdjointWork(double* A, double* adj, int order);
             void calculateAdjoint(double* A, double* adj, int order, int start, int end);
             void calculateMinor(double* currentArray, double* minorArray, int i, int j, int n, int order);
@@ -48,11 +48,12 @@ namespace SimpiNS
             int getCols() { return cols; }
             double& get(int row, int col) { return arr[row + (col * rows)]; }
             bool isSquareMatrix() { return rows == cols; }
+            void fill(double *arr);
 
-            int determinant();
-            void adjoint(Matrix* adj);
+            double determinant();
+            void adjoint(Matrix &adj);
             
-            void inverse(Matrix* inv);
+            void inverse(Matrix &inv);
             void luDecomposition(Matrix* lower, Matrix* upper);
             void backwardSubstitution(float* b, float* x);
             void forwardSubstitution(float *b, float* x); 

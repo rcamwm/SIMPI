@@ -8,3 +8,6 @@ Compile with:
 
 Run with:
 ../SIMPI$ ./mpi user [number of parallel processes to use]
+
+Run test cases with:
+../SIMPI$ ./mpi tests [number of parallel processes to use]

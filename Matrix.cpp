@@ -24,13 +24,43 @@ namespace SimpiNS
         mainSimpi->freeMatrix(uniqueID); // frees and unlinks memory
     }
 
-    int Matrix::determinant()
+    /**
+    * Fills the matrix with the values of arr.
+    * Each value of arr will be placed into the next open row position.
+    * When a row is filled it will move onto the next column.
+    * This will continue until all rows and columns are filled.
+    * 
+    * This function can be optimized in the future, 
+    * but there's probably no use for it outside of test cases.
+    * 
+    * @param arr Values to be entered into this Matrix.
+    *            Make sure that arr has at least (this->getRows * this->getCols) elements
+    */
+    void Matrix::fill(double *arr)
+    {
+        if (mainSimpi->getID() == 0)
+        {
+            int i = 0;
+            for (int row = 0; row < rows; row++)
+            {
+                for (int col = 0; col < cols; col++)
+                {
+                    get(row, col) = arr[i];
+                    i++;
+                }
+            }
+        }
+        mainSimpi->synch();
+    }
+
+    double Matrix::determinant()
     {
         if (!isSquareMatrix()) 
         {
             std::cout << "Invalid Matrix: Must be square matrix" << std::endl;
             exit(1);
         }
+        mainSimpi->synch();
         return calculateDeterminant(this->arr, getRows(), getCols());
     }
 
@@ -45,12 +75,12 @@ namespace SimpiNS
     * @param order Order of *this Matrix
     * @return Matrix's determinant
     * */
-    int Matrix::calculateDeterminant(double* A, int n, int order)
+    double Matrix::calculateDeterminant(double* A, int n, int order)
     {
         if (n == 1) // Base case : if Matrix contains single element
             return A[0];
 
-        int det = 0; // result
+        double det = 0; // result
         int sign = 1; // sign multiplier
         double m[order * order]; // Array of minors
 
@@ -67,14 +97,14 @@ namespace SimpiNS
         return det;
     }
 
-    void Matrix::adjoint(Matrix *adj)
+    void Matrix::adjoint(Matrix &adj)
     {
-        if (!isSquareMatrix() || !adj->isSquareMatrix() || getRows() != adj->getRows()) 
+        if (!isSquareMatrix() || !adj.isSquareMatrix() || getRows() != adj.getRows()) 
         {
             std::cout << "Invalid Matrices: Must be equal sized square matrices" << std::endl;
             exit(1);
         }
-        allocateAdjointWork(this->arr, adj->arr, getRows());
+        allocateAdjointWork(this->arr, adj.arr, getRows());
         mainSimpi->synch();
     }
 
@@ -314,9 +344,9 @@ namespace SimpiNS
     B corresponds to individual columns of an nxn identity Matrix
     X represents each corresponding column of the inverse Matrix
     */
-    void Matrix::inverse(Matrix* inv) 
+    void Matrix::inverse(Matrix &inv) 
     {
-        if (!isSquareMatrix() || !inv->isSquareMatrix() || getRows() != inv->getRows()) 
+        if (!isSquareMatrix() || !inv.isSquareMatrix() || getRows() != inv.getRows()) 
         {
             std::cout << "Invalid Matrices: Must be equal sized square matrices" << std::endl;
             exit(1);
@@ -378,7 +408,7 @@ namespace SimpiNS
 
             //Input X column to corresponding columnn in final inverse Matrix
             for (int c = 0; c < getRows(); c++)
-                inv->get(c,a) = solutionCol[c];
+                inv.get(c,a) = solutionCol[c];
         }
 
         // Calculate and execute which processes take the leftover rows 
@@ -418,7 +448,7 @@ namespace SimpiNS
 
                     //Input X column to corresponding columnn in final inverse Matrix
                     for (int c = 0; c < getRows(); c++) 
-                        inv->get(c, a) = solutionCol[c];
+                        inv.get(c, a) = solutionCol[c];
                     
                 }
             }
@@ -654,7 +684,7 @@ namespace SimpiNS
     void Matrix::failSafe(Vector* constants, Vector* solution)
     {
         Matrix* inv = new Matrix(getRows(), getCols());
-        inverse(inv);
+        inverse(*inv);
         mainSimpi->synch();
 
         int processCount = mainSimpi->getProcessCount();
