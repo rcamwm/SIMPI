@@ -1,3 +1,12 @@
+/*
+    This file contains test cases to determine if Matrix functions are continuing to give accurate results.
+    Test cases use smaller Matrix sizes and have specific hard coded inputs that were decided with a random 
+    number generator. These random inputs were then calculated outside of this program and those specific 
+    results are compared to the output of each Matrix function.
+
+    Testing efficiency and speed should be done in another file using much larger Matrix sizes and random input. 
+*/
+
 #include <assert.h>
 #include <signal.h>
 #include <string.h>
@@ -32,10 +41,12 @@ void test_matrix_equality()
     double x[] = {1, 2, 3,
                   4, 5, 6,
                   7, 8, 9};
-    Matrix A(3, 3); A.fill(x);
+    Matrix A(3, 3); 
+    A.fill(x);
     assertAndPrint(passMessage, testNo++, A == A);
 
-    Matrix B(3, 3); B.fill(x);
+    Matrix B(3, 3); 
+    B.fill(x);
     assertAndPrint(passMessage, testNo++, A == B);
 
     B.get(2, 2) += 0.001;
@@ -58,8 +69,10 @@ void test_matrix_inequality()
     double y[] = {0.1, 2.0, 3.0,
                   4.0, 0.5, 6.0,
                   7.0, 8.0, 0.9};
-    Matrix A(3, 3); A.fill(x);
-    Matrix B(3, 3); B.fill(y);
+    Matrix A(3, 3); 
+    A.fill(x);
+    Matrix B(3, 3); 
+    B.fill(y);
     assertAndPrint(passMessage, testNo++, A != B);
 
     if (processID == 0)
@@ -68,6 +81,50 @@ void test_matrix_inequality()
     assertAndPrint(passMessage, testNo++, !(A != B));
 
     Matrix C(2, 3);
+    assertAndPrint(passMessage, testNo++, B != C);
+}
+
+void test_vector_equality()
+{
+    std::string passMessage = "test_vector_equality() passes test ";
+    int testNo = 1;
+
+    double x[] = {1, 2, 3, 4, 5, 6};
+    Vector A(6);
+    A.fill(x);
+    assertAndPrint(passMessage, testNo++, A == A);
+
+    Vector B(6); 
+    B.fill(x);
+    assertAndPrint(passMessage, testNo++, A == B);
+
+    B.getRef(2) += 0.001;
+    assertAndPrint(passMessage, testNo++, !(A == B));
+
+    double y[] = {1, 2, 3, 4, 5}; 
+    Vector C(5);
+    C.fill(y);
+    assertAndPrint(passMessage, testNo++, !(A == C));
+}
+
+void test_vector_inequality()
+{
+    std::string passMessage = "test_matrix_inequality_operator() passes test ";
+    int testNo = 1;
+    
+    double x[] = {1, 2, 3, 4, 5, 6};
+    Vector A(6);
+    A.fill(x);
+    double y[] = {0.1, 2.0, 0.3, 4.0, 0.5, 6,0};
+    Vector B(6);
+    B.fill(y);
+    assertAndPrint(passMessage, testNo++, A != B);
+
+    if (processID == 0) {B.getRef(0) *= 10; B.getRef(2) *= 10; B.getRef(4) *= 10;}
+    mainSimpi->synch();
+    assertAndPrint(passMessage, testNo++, !(A != B));
+
+    Vector C(5);
     assertAndPrint(passMessage, testNo++, B != C);
 }
 
@@ -251,47 +308,60 @@ void test_adjoint()
 }
 
 /***
- * Copy-paste test function for failsafe(),
- * and just make sure that the Matrices are diagonally dominant
- * 
- * No use filling this in until jacobi() has been fixed to work with multiple processes().
- * 
+ * DO NOT RUN WITH MULTIPLE PROCESSES
 */
-void test_solve_system_with_jacobi() {}
+void test_solve_system_with_jacobi() 
+{
+    std::string passMessage = "test_solve_system_with_jacobi() passes test ";
+    int testNo = 1;
+    double a[] = {40,  7,  1,  3,  3, 
+                   7, 30, 10,  7,  1, 
+                   8, 10, 40,  2,  3, 
+                   6,  2,  7, 90,  4, 
+                   4,  3,  1,  8, 80};
+    Matrix A(5, 5);
+    A.fill(a);
+
+    double b[] = {6, 8, 7, 10, 6};
+    Vector B(5);
+    B.fill(b);
+
+    Vector x(5);
+    A.solveSystem(&B, &x);
+    // Then check if A * x == B
+    double y[] = {0.1042, 0.1866, 0.0991, 0.0900, 0.0526};
+    Vector Y(5);
+    Y.fill(y);
+    Vector::setEqualityPrecision(0.0001f);
+    assertAndPrint(passMessage, testNo++, Y == x);
+    Vector::setEqualityPrecision(0.0f);
+}
 
 void test_solve_system_with_failsafe()
 {
-    Matrix A(4, 5);
+    std::string passMessage = "test_solve_system_with_failsafe() passes test ";
+    int testNo = 1;
+    double a[] = {10,  0,   3,  6, -6, 
+                  -3, -7,   4, -7,  6, 
+                   3,  8,  -2,  4, -8, 
+                  -4,  2,  -5,  2,  4, 
+                   1,  10, -2,  5, -2};
+    Matrix A(5, 5);
+    A.fill(a);
+
+    double b[] = {3, 9, 3, 10, 7};
     Vector B(5);
-    Vector C(5);
+    B.fill(b);
 
-    mainSimpi->synch();
-    
-    for (int y = 0; y < 5; y++)
-    {
-        for (int x = 0; x < 4; x++)
-        {
-            A.get(x, y) = rand() % 10 + 1;
-        }
-        B.set(y, rand() % 10 + 1);
-    }
-    mainSimpi->synch();
-
-    for (int y = 0; y < 5; y++)
-    {
-        for (int x = 0; x < 4; x++)
-            if (mainSimpi->getID() == 0 && x == y)
-                A.get(x, y) /= 3;
-    }
-    mainSimpi->synch();
-
-    for (int i = 0; i < 5; i++)
-        C.set(i, 0);
-    
-    mainSimpi->synch();
-    A.solveSystem(&B, &C);
-    if (mainSimpi->getID() == 0) { std::cout << A << "times\n" << C << "equals\n" << B; }
-    
+    Vector x(5);
+    A.solveSystem(&B, &x);
+    // Then check if A * x == B
+    double y[] = {26.3367, 7.3113, -20.5108, -22.3977, 10.7414};
+    Vector Y(5);
+    Y.fill(y);
+    Vector::setEqualityPrecision(0.0001f);
+    assertAndPrint(passMessage, testNo++, Y == x);
+    Vector::setEqualityPrecision(0.0f);
 }
 
 void segfault_printer(int dummy)
@@ -305,17 +375,19 @@ void segfault_printer(int dummy)
 void runTests() 
 {
     assertAndPrint("\nNow running all test cases...", 0, 0);
-    test_matrix_equality();
-    test_matrix_inequality();
-    test_matrix_multiplication_same_size();
-    test_matrix_multiplication_more_rows();
-    test_matrix_multiplication_more_cols();
-    test_inverse();
-    test_determinant();
-    test_adjoint();
+    // test_matrix_equality();
+    // test_matrix_inequality();
+    // test_vector_equality();
+    // test_vector_inequality();
+    // test_matrix_multiplication_same_size();
+    // test_matrix_multiplication_more_rows();
+    // test_matrix_multiplication_more_cols();
+    // test_inverse();
+    // test_determinant();
+    // test_adjoint();
 
-    // test_solve_system_with_jacobi(); // Does nothing -> fix jacobi() first
-    // test_solve_system_with_failsafe(); // Need to write comparison operators for Vector
+    test_solve_system_with_jacobi(); // DO NOT RUN WITH MULTIPLE PROCESSES
+    //test_solve_system_with_failsafe();
     assertAndPrint("All tests have passed!", 0, 0);
 }
 

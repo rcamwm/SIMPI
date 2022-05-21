@@ -15,6 +15,7 @@ namespace SimpiNS
             std::string uniqueID;
             static Simpi* mainSimpi;
             static double equalityPrecision;
+            static int printPrecision;
 
             void initializeArrayToZero(double *A, int size);
 
@@ -37,8 +38,9 @@ namespace SimpiNS
             void calculateProduct(Matrix &B, Matrix* C, int start, int end, bool rowGreaterThanCol);
 
         public:
-            static void setSimpi(Simpi *s) { mainSimpi = s; }
-            static void setEqualityPrecision(double d) { equalityPrecision = d; }
+            static void setSimpi(Simpi *s);
+            static void setEqualityPrecision(double d);
+            static void setPrintPrecision(int p);
 
             Matrix(int rowCount, int colCount);
             ~Matrix();
@@ -48,7 +50,7 @@ namespace SimpiNS
             int getCols() { return cols; }
             double& get(int row, int col) { return arr[row + (col * rows)]; }
             bool isSquareMatrix() { return rows == cols; }
-            void fill(double *arr);
+            void fill(double *fillArray);
 
             double determinant();
             void adjoint(Matrix &adj);

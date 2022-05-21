@@ -34,6 +34,7 @@ int main(int argc, char* argv[])
     processID = atoi(argv[1]);
     mainSimpi = new Simpi(processID, atoi(argv[2])); // argv[2]: # of processes being used
     Matrix::setEqualityPrecision(0.00f);
+    Matrix::setPrintPrecision(2);
     Matrix::setSimpi(mainSimpi);
     Vector::setSimpi(mainSimpi);
     userDefinedActivity();

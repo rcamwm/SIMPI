@@ -2,12 +2,34 @@
 
 namespace SimpiNS
 {
-    // Must be set before any Matrix objects are created
+    /**
+     * Sets a Simpi object for the entire Matrix class. The Simpi object will keep track of each 
+     * Matrix object's shared memory between processes. This function MUST be called before 
+     * any Matrix objects are created.
+     * 
+     * @param s A Simpi object to share between all Matrix objects
+     */
+    void Matrix::setSimpi(Simpi *s) { mainSimpi = s; }
     Simpi* Matrix::mainSimpi;
 
-    // Since Matrix elements are doubles,
-    // can set precision to specific decimal place to account for potential stray bits
+    /**
+     * Sets precision to specific decimal place to account for potential rounding errors
+     * when comparing two Matric objects. Equality between two Matrix objects is determined 
+     * by subtracting each same index element. They are considered equal if the absolute 
+     * value difference between them is less than the value of d
+     * 
+     * @param d the new value to compare two Matrix elements against
+     */
+    void Matrix::setEqualityPrecision(double d) { equalityPrecision = d; }
     double Matrix::equalityPrecision = 0.0f;
+
+    /**
+     * Sets the number of digits after the decimal places to show when printing a Matrix object
+     * 
+     * @param p how many decimal places to show for each element
+     */
+    void Matrix::setPrintPrecision(int p) { printPrecision = p; }
+    int Matrix::printPrecision = 2;
 
     Matrix::Matrix(int rowCount, int colCount)
     {
@@ -36,7 +58,7 @@ namespace SimpiNS
     * @param arr Values to be entered into this Matrix.
     *            Make sure that arr has at least (this->getRows * this->getCols) elements
     */
-    void Matrix::fill(double *arr)
+    void Matrix::fill(double *fillArray)
     {
         if (mainSimpi->getID() == 0)
         {
@@ -45,7 +67,7 @@ namespace SimpiNS
             {
                 for (int col = 0; col < cols; col++)
                 {
-                    get(row, col) = arr[i];
+                    get(row, col) = fillArray[i];
                     i++;
                 }
             }
@@ -491,6 +513,7 @@ namespace SimpiNS
     }
 
     /*
+    Ax=B
     Solves a linear system of equations
     If the Matrix is diagonally dominant, jacobi-iterative method is used
     else, the inverse mutliplication method is used
@@ -937,7 +960,7 @@ namespace SimpiNS
                 out << std::endl;
                 for (int j = 0; j < m.cols; j++)
                 {
-                    out << std::fixed << std::setprecision(2) << m.arr[i + j * m.rows];
+                    out << std::fixed << std::setprecision(Matrix::printPrecision) << m.arr[i + j * m.rows];
                     out << ", ";
                 }
             }
