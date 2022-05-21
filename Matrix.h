@@ -1,7 +1,10 @@
 #ifndef MATRIX_H
 #define MATRIX_H
 
+#include <iomanip>
+#include <random>
 #include <math.h>
+
 #include "Simpi.h"
 
 namespace SimpiNS
@@ -50,6 +53,7 @@ namespace SimpiNS
             double& get(int row, int col) { return arr[row + (col * rows)]; }
             bool isSquareMatrix() { return rows == cols; }
             void fill(double *fillArray);
+            void fillRandom(int min, int max);
 
             double determinant();
             void adjoint(Matrix &adj);

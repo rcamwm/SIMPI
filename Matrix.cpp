@@ -75,6 +75,24 @@ namespace SimpiNS
         mainSimpi->synch();
     }
 
+    void Matrix::fillRandom(int min, int max)
+    {
+        if (mainSimpi->getID() == 0)
+        {
+            std::random_device rd;
+            std::default_random_engine eng(rd());
+            std::uniform_real_distribution<double> distr(min, max);
+            for (int row = 0; row < rows; row++)
+            {
+                for (int col = 0; col < cols; col++)
+                {
+                    get(row, col) = distr(eng);
+                }
+            }
+        }
+        mainSimpi->synch();
+    }
+
     double Matrix::determinant()
     {
         if (!isSquareMatrix()) 
