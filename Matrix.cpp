@@ -520,21 +520,27 @@ namespace SimpiNS
     takes in a Vector of constants that each row is to be solved for and a solution Vector of 0s in which the solution will be written in
     void -> void
     */
-    void Matrix::solveSystem(Vector *constants, Vector* solution)
+    void Matrix::solveSystem(Matrix &solution, Matrix &constants)
     {
+        if (solution.cols != 1 || solution.rows != rows || constants.cols != 1 || constants.rows != rows)
+        {
+            std::cout << "Cannot solve linear system of equations for x(" << solution.rows << ", " << solution.cols << ") ";
+            std::cout << "and B(" << constants.rows << ", " << constants.cols << ")" << std::endl;
+            std::cout << "Parameters must be size x(1, " << rows << ") and B(1, " << rows << std::endl;
+            exit(1);
+        }
         bool dd = isDiagonallyDominant(); 
         mainSimpi->synch();
+
         if (dd)
         {
-            if (mainSimpi->getID() == 0) { std::cout << "jacobi" << std::endl; }
             mainSimpi->synch();
-            jacobi(constants, solution);
+            jacobi(solution, constants);
         }
         else
         {
-            if (mainSimpi->getID() == 0) { std::cout << "failsafe" << std::endl; }        
             mainSimpi->synch();
-            failSafe(constants, solution);
+            failSafe(solution, constants);
         }
         mainSimpi->synch();
     }
@@ -544,18 +550,18 @@ namespace SimpiNS
         outputs solution to a Vector of 0s passed into it
         void->void
     */
-    void Matrix::jacobi(Vector* constants, Vector* solution) 
+    void Matrix::jacobi(Matrix &solution, Matrix &constants) 
     {
         int id = mainSimpi->getID();
         int processCount = mainSimpi->getProcessCount();
-        if (processCount > constants->getSize()) 
-            processCount = constants->getSize();
+        if (processCount > constants.getRows()) 
+            processCount = constants.getRows();
         
-        Matrix* saveEq = new Matrix(getRows(), getCols() + 1); // save equations from modification
-        Vector* saveConst = new Vector(constants->getSize()); // saves input vector
-        Vector *prev = new Vector(constants->getSize()); // shared mem containing a copy of values
+        Matrix saveEq(getRows(), getCols() + 1); // save equations from modification
+        Matrix saveConst(constants.getRows(), 1); // saves input Matrix
+        Matrix prev(constants.getRows(), 1); // shared mem containing a copy of values
 
-        int work = constants->getSize() / processCount; 
+        int work = constants.getRows() / processCount; 
         int start = 0;
         int end = 0;
         if (id < processCount) // Extra processes get no work => start and end stay at 0
@@ -563,7 +569,7 @@ namespace SimpiNS
             start = id * work;
             end = start + work;
         }
-        int remainingWork = constants->getSize() % processCount;
+        int remainingWork = constants.getRows() % processCount;
         if (id == processCount - 1) // Last active process gets all remaining work
             end += remainingWork;
         // synch() is called (end - start) number of times in several jacobi helper functions
@@ -573,72 +579,72 @@ namespace SimpiNS
 
         jacobiSaveInputs(start, end, saveEq, constants, saveConst);
         mainSimpi->synch();
-        std::cout << id << ": saved" << std::endl;
+        std::cout << "ID " << id << ": saved" << std::endl;
 
         // Switches diagonals with solution elements,
         // then divides each matrix row by their original diagonal element 
         jacobiSwitchAndDivide(start, end, constants, solution, prev, synchOffset);
         mainSimpi->synch();
-        std::cout << id << ": switched and divided" << std::endl;
+        std::cout << "ID " << id << ": switched and divided" << std::endl;
 
         // First iteration with substitution 1
         jacobiFirstIteration(start, end, solution, prev, synchOffset);
         mainSimpi->synch();
-        std::cout << id << ": iterated first" << std::endl;
+        std::cout << "ID " << id << ": iterated first" << std::endl;
 
         // Repeat iterations with calculated results
         jacobiRemainingIterations(start, end, solution, prev, synchOffset);
         mainSimpi->synch();
-        std::cout << id << ": iterated remaining" << std::endl;
+        std::cout << "ID " << id << ": iterated remaining" << std::endl;
 
         jacobiRestoreInputs(start, end, saveEq, constants, saveConst);
         mainSimpi->synch();
-        std::cout << id << ": restored" << std::endl;
+        std::cout << "ID " << id << ": restored" << std::endl;
 
 
         return;
     }
 
-    void Matrix::jacobiSaveInputs(int start, int end, Matrix* saveEq, Vector* constants, Vector* saveConst)
+    void Matrix::jacobiSaveInputs(int start, int end, Matrix &saveEq, Matrix &constants, Matrix &saveConst)
     {
         for (int i = start; i < end; i++) 
         {
             for (int j = 0; j < getCols(); j++) 
-                saveEq->get(i,j) = get(i, j);
+                saveEq.get(i,j) = get(i, j);
 
-            saveEq->get(i,getCols() + 1) = constants->getRef(i);
-            saveConst->getRef(i) = constants->getRef(i);
+            saveEq.get(i,getCols() + 1) = constants.get(i, 0);
+            saveConst.get(i, 0) = constants.get(i, 0);
         }
     }
 
-    /*
-        In each row, the diagonal element of the matrix is switched with the corresponding element from the solution vector.
-        Every element of that matrix row is then divided by the value that was just placed in the solution vector.
-        Each element of that matrix row that was not switched is also multiplied by -1.
-    */
-    void Matrix::jacobiSwitchAndDivide(int start, int end, Vector* constants, Vector* solution, Vector *prev, int synchOffset)
+    // /*
+    //     In each row, the diagonal element of the matrix is switched with the corresponding element from the solution vector.
+    //     Every element of that matrix row is then divided by the value that was just placed in the solution vector.
+    //     Each element of that matrix row that was not switched is also multiplied by -1.
+    // */
+    void Matrix::jacobiSwitchAndDivide(int start, int end, Matrix &constants, Matrix &solution, Matrix &prev, int synchOffset)
     {
         for (int i = start; i < end; i++) 
         {
             double temp = get(i, i);
-            get(i, i) = constants->getRef(i);
-            constants->getRef(i) = temp;
+            get(i, i) = constants.get(i, 0);
+            constants.get(i, 0) = temp;
             for (int j = 0; j < getCols(); j++) 
             {
                 if (j != i)
                     get(i, j) *= -1;
         
-                get(i, j) /= constants->getRef(i);
+                get(i, j) /= constants.get(i, 0);
                 //mainSimpi->synch();
             }
-            prev->getRef(i) = 1.0;
-            solution->getRef(i) = constants->getRef(i);
+            prev.get(i, 0) = 1.0;
+            solution.get(i, 0) = constants.get(i, 0);
             mainSimpi->synch();
         }
         mainSimpi->synchExtraCycles(synchOffset);
     }
 
-    void Matrix::jacobiFirstIteration(int start, int end, Vector* solution, Vector *prev, int synchOffset)
+    void Matrix::jacobiFirstIteration(int start, int end, Matrix &solution, Matrix &prev, int synchOffset)
     {
         for (int i = start; i < end; i++) 
         {
@@ -648,24 +654,24 @@ namespace SimpiNS
                 if (j == i)
                     rowSum += get(i, j);
                 else
-                    rowSum += (get(i, j) * prev->getRef(j));
+                    rowSum += (get(i, j) * prev.get(j, 0));
                 
                 //mainSimpi->synch();
             }
-            solution->getRef(i) = rowSum;
+            solution.get(i, 0) = rowSum;
             mainSimpi->synch();
         }
         mainSimpi->synchExtraCycles(synchOffset);
     }
 
-    void Matrix::jacobiRemainingIterations(int start, int end, Vector* solution, Vector *prev, int synchOffset)
+    void Matrix::jacobiRemainingIterations(int start, int end, Matrix &solution, Matrix &prev, int synchOffset)
     {
         for (int k = 0; k < 1000; k++)
         {
             for (int i = start; i < end; i++)
             {
                 //save prev value for comparision
-                prev->getRef(i) = solution->getRef(i);
+                prev.get(i, 0) = solution.get(i, 0);
                 mainSimpi->synch();
             }
             mainSimpi->synchExtraCycles(synchOffset);
@@ -677,10 +683,10 @@ namespace SimpiNS
                     if (j == i) {
                         rowSum += get(i, j);
                     } else {
-                        rowSum += (get(i, j) * prev->getRef(j));
+                        rowSum += (get(i, j) * prev.get(j, 0));
                     }
                 }
-                solution->getRef(i) = rowSum;
+                solution.get(i, 0) = rowSum;
                 //mainSimpi->synch();
             }
             //wait at end of each loop for all processes before beginning next iteration
@@ -688,14 +694,14 @@ namespace SimpiNS
         }
     }
 
-    void Matrix::jacobiRestoreInputs(int start, int end, Matrix* saveEq, Vector* constants, Vector* saveConst)
+    void Matrix::jacobiRestoreInputs(int start, int end, Matrix &saveEq, Matrix &constants, Matrix &saveConst)
     {
         for (int i = start; i < end; i++) 
         {
             for (int j = 0; j < getCols(); j++) 
-                get(i, j) = saveEq->get(i,j);
+                get(i, j) = saveEq.get(i,j);
             
-            constants->getRef(i) = saveConst->getRef(i);
+            constants.get(i, 0) = saveConst.get(i, 0);
         }
     }
 
@@ -704,7 +710,7 @@ namespace SimpiNS
     Uses the inverse-mutliplication method. 
     void->void
     */
-    void Matrix::failSafe(Vector* constants, Vector* solution)
+    void Matrix::failSafe(Matrix &solution, Matrix &constants)
     {
         Matrix* inv = new Matrix(getRows(), getCols());
         inverse(*inv);
@@ -713,7 +719,7 @@ namespace SimpiNS
         int processCount = mainSimpi->getProcessCount();
         int id = mainSimpi->getID();
         
-        int vectorSize = constants->getSize();
+        int vectorSize = constants.getRows();
         int work = vectorSize / processCount; 
         int start = 0;
         int end = 0;
@@ -722,7 +728,7 @@ namespace SimpiNS
             start = id * work;
             end = start + work;
         }
-        int remainingWork = constants->getSize() % processCount;
+        int remainingWork = constants.getRows() % processCount;
         if (id == processCount - 1) // Last active process gets all remaining work
             end += remainingWork;
         
@@ -732,9 +738,9 @@ namespace SimpiNS
             sol = 0;
             for(int j = 0; j < vectorSize; j++)
             {
-                sol += (inv->get(i, j)*constants->getRef(j));
+                sol += (inv->get(i, j) * constants.get(j, 0));
             }
-            solution->getRef(i) = sol;
+            solution.get(i, 0) = sol;
         }
         mainSimpi->synch();
         return;

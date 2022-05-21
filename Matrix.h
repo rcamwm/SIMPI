@@ -3,7 +3,6 @@
 
 #include <math.h>
 #include "Simpi.h"
-#include "Vector.h"
 
 namespace SimpiNS
 {
@@ -26,11 +25,11 @@ namespace SimpiNS
             void calculateMinor(double* currentArray, double* minorArray, int i, int j, int n, int order);
 
             // jacobi() helper functions
-            void jacobiSaveInputs(int start, int end, Matrix* saveEq, Vector* constants, Vector* saveConst);
-            void jacobiSwitchAndDivide(int start, int end, Vector* constants, Vector* solution, Vector *prev, int synchOffset);
-            void jacobiFirstIteration(int start, int end, Vector* solution, Vector *prev, int synchOffset);
-            void jacobiRemainingIterations(int start, int end, Vector* solution, Vector *prev, int synchOffset);
-            void jacobiRestoreInputs(int start, int end, Matrix* saveEq, Vector* constants, Vector* saveConst);
+            void jacobiSaveInputs(int start, int end, Matrix &saveEq, Matrix &constants, Matrix &saveConst);
+            void jacobiSwitchAndDivide(int start, int end, Matrix &constants, Matrix &solution, Matrix &prev, int synchOffset);
+            void jacobiFirstIteration(int start, int end, Matrix &solution, Matrix &prev, int synchOffset);
+            void jacobiRemainingIterations(int start, int end, Matrix &solution, Matrix &prev, int synchOffset);
+            void jacobiRestoreInputs(int start, int end, Matrix &saveEq, Matrix &constants, Matrix &saveConst);
 
             // algebra helper functions
             void determineEquality(Matrix &comparand, int start, int end, bool rowGreaterThanCol, bool* eqValue);
@@ -60,9 +59,9 @@ namespace SimpiNS
             void backwardSubstitution(float* b, float* x);
             void forwardSubstitution(float *b, float* x); 
 
-            void solveSystem(Vector* constants, Vector* solution);
-            void jacobi(Vector* constants, Vector* solution); // TODO: fix, synch() getting stuck in jacobiRemainingIterations()
-            void failSafe(Vector* constants, Vector* solution);
+            void solveSystem(Matrix &solution, Matrix &constants);
+            void jacobi(Matrix &solution, Matrix &constants); // TODO: fix, synch() getting stuck in jacobiRemainingIterations()
+            void failSafe(Matrix &solution, Matrix &constants);
             bool isDiagonallyDominant();
 
             friend std::ostream& operator<<(std::ostream& out, const Matrix& m);
