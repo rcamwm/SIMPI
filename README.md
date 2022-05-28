@@ -25,9 +25,10 @@ No interaction with this file is necessary from a user.
 The Matrix.cpp file houses all of the mathematical functions.
 No interaction with this file is necessary from a user. 
 
-## The Tests File
-The tests.cpp file can optionally be run through MPI, exactly how the user.cpp file would be.
-It runs through every major Matrix mathematical function and confirms it's working correctly.
+## The Test Cases and Test Times Files
+The test_cases.cpp and test_times.cpp files can optionally be run through MPI, exactly how the user.cpp file would be.
+test_cases.cpp runs through every major Matrix mathematical function and confirms it's working correctly.
+test_times.cpp measures how long it takes to perform Matrix operations with larger matrices. 
 
 ## Usage 
 To run this program first clone this repository to a local linux machine and edit the user.cpp file, then:
@@ -36,9 +37,6 @@ Compile with:
 ../SIMPI$ make
 
 Run with:
-../SIMPI$ ./mpi user *n*
+../SIMPI$ ./mpi *program* *n*
 
-Run test cases with:
-../SIMPI$ ./mpi tests *n*
-
-where *n* is the desired number of parallel processes to use
+where *program* is user, test_cases, or test_times, and *n* is the desired number of parallel processes to use
