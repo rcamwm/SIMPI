@@ -804,8 +804,8 @@ namespace SimpiNS
         mainSimpi->synch();
 
         // Processes divide the rows if matrices have more rows, and divide the columns if not
-        bool rowGreaterThanCol = rows > cols;
-        int div = (rowGreaterThanCol) ? rows : cols;
+        bool moreRows = rows > cols;
+        int div = (moreRows) ? rows : cols; // Number of lines to divide between processes
 
         int processCount = mainSimpi->getProcessCount();
         int processID = mainSimpi->getID();
@@ -815,14 +815,14 @@ namespace SimpiNS
             int start = processID;
             int end = start + 1;
             if (processID < div)
-                determineEquality(comparand, start, end, rowGreaterThanCol, equalityBool);
+                determineEquality(comparand, start, end, moreRows, equalityBool);
         }
         else 
         {
             int work = div / processCount;
             int start = processID * work;
             int end = start + work;
-            determineEquality(comparand, start, end, rowGreaterThanCol, equalityBool);
+            determineEquality(comparand, start, end, moreRows, equalityBool);
 
             int leftoverWork = div % processCount;
             if (leftoverWork != 0)
@@ -830,7 +830,7 @@ namespace SimpiNS
                 start = (work * processCount) + processID;
                 end = start + 1;
                 if (processID < leftoverWork)
-                    determineEquality(comparand, start, end, rowGreaterThanCol, equalityBool);
+                    determineEquality(comparand, start, end, moreRows, equalityBool);
             }         
         }
         mainSimpi->synch();
@@ -874,10 +874,10 @@ namespace SimpiNS
         return eq;
     }
 
-    void Matrix::determineEquality(Matrix &comparand, int start, int end, bool rowGreaterThanCol, bool* eqValue)
+    void Matrix::determineEquality(Matrix &comparand, int start, int end, bool moreRows, bool* eqValue)
     {
         int rowStart, rowEnd, colStart, colEnd;
-        if (rowGreaterThanCol) { rowStart = start, rowEnd = end, colStart = 0, colEnd = cols; }
+        if (moreRows) { rowStart = start, rowEnd = end, colStart = 0, colEnd = cols; }
         else { rowStart = 0, rowEnd = rows, colStart = start, colEnd = end; }
 
         for (int row = rowStart; row < rowEnd; row++)
@@ -910,8 +910,8 @@ namespace SimpiNS
         Matrix *C = new Matrix(rows, B.cols);
 
         // Processes divide the rows if C has more rows, and divide the columns if not
-        bool rowGreaterThanCol = C->rows > C->cols;
-        int div = (rowGreaterThanCol) ? C->rows : C->cols;
+        bool moreRows = C->rows > C->cols;
+        int div = (moreRows) ? C->rows : C->cols; // Number of lines to divide between processes
 
         int processCount = mainSimpi->getProcessCount();
         int processID = mainSimpi->getID();
@@ -921,14 +921,14 @@ namespace SimpiNS
             int start = processID;
             int end = start + 1;
             if (processID < div)
-                calculateProduct(B, C, start, end, rowGreaterThanCol);
+                calculateProduct(B, C, start, end, moreRows);
         }
         else 
         {
             int work = div / processCount;
             int start = processID * work;
             int end = start + work;
-            calculateProduct(B, C, start, end, rowGreaterThanCol);
+            calculateProduct(B, C, start, end, moreRows);
 
             int leftoverWork = div % processCount;
             if (leftoverWork != 0)
@@ -936,7 +936,7 @@ namespace SimpiNS
                 start = (work * processCount) + processID;
                 end = start + 1;
                 if (processID < leftoverWork)
-                    calculateProduct(B, C, start, end, rowGreaterThanCol);
+                    calculateProduct(B, C, start, end, moreRows);
             }         
         }
         mainSimpi->synch();
@@ -953,13 +953,13 @@ namespace SimpiNS
         lhs = lhs.multiply(rhs);
     }
 
-    void Matrix::calculateProduct(Matrix &B, Matrix* C, int start, int end, bool rowGreaterThanCol)
+    void Matrix::calculateProduct(Matrix &B, Matrix* C, int start, int end, bool moreRows)
     {
         Matrix *A = this; // For clarity
 
         // Processes divide the rows if C has more rows, and divide the columns if not
         int rowStart, rowEnd, colStart, colEnd;
-        if (rowGreaterThanCol) { rowStart = start, rowEnd = end, colStart = 0, colEnd = C->cols; }
+        if (moreRows) { rowStart = start, rowEnd = end, colStart = 0, colEnd = C->cols; }
         else { rowStart = 0, rowEnd = C->rows, colStart = start, colEnd = end; }
 
         for (int row = rowStart; row < rowEnd; row++)

@@ -18,18 +18,11 @@ using namespace SimpiNS;
 int processID;
 Simpi *mainSimpi;
 
-void assertAndPrint(std::string message, int i, bool test)
+void assertAndPrint(std::string message, bool test)
 {
-    if (i != 0)
-        assert(test);
-
+    assert(test);
     if (processID == 0)
-    {
-        std::cout << message;
-        if (i != 0)
-            std::cout << i;
-        std::cout << std::endl;
-    }     
+        std::cout << message << std::endl;    
 }
 
 void test_equality()
@@ -42,19 +35,19 @@ void test_equality()
                   7, 8, 9};
     Matrix A(3, 3); 
     A.fill(x);
-    assertAndPrint(passMessage, testNo++, A == A);
+    assertAndPrint(passMessage + std::to_string(testNo++), A == A);
 
     Matrix B(3, 3); 
     B.fill(x);
-    assertAndPrint(passMessage, testNo++, A == B);
+    assertAndPrint(passMessage + std::to_string(testNo++), A == B);
 
     B.get(2, 2) += 0.001;
-    assertAndPrint(passMessage, testNo++, !(A == B));
+    assertAndPrint(passMessage + std::to_string(testNo++), !(A == B));
 
     double y[] = {1, 2, 3, 4, 5, 6, 7, 8, 9}; 
     Matrix C(1, 9);
     C.fill(y);
-    assertAndPrint(passMessage, testNo++, !(A == C));
+    assertAndPrint(passMessage + std::to_string(testNo++), !(A == C));
 }
 
 void test_inequality()
@@ -72,15 +65,15 @@ void test_inequality()
     A.fill(x);
     Matrix B(3, 3); 
     B.fill(y);
-    assertAndPrint(passMessage, testNo++, A != B);
+    assertAndPrint(passMessage + std::to_string(testNo++), A != B);
 
     if (processID == 0)
         for (int i = 0; i < B.getCols(); i++) { B.get(i, i) *= 10; }
     mainSimpi->synch();
-    assertAndPrint(passMessage, testNo++, !(A != B));
+    assertAndPrint(passMessage + std::to_string(testNo++), !(A != B));
 
     Matrix C(2, 3);
-    assertAndPrint(passMessage, testNo++, B != C);
+    assertAndPrint(passMessage + std::to_string(testNo++), B != C);
 }
 
 void test_matrix_multiplication_same_size()
@@ -109,10 +102,10 @@ void test_matrix_multiplication_same_size()
                   89, 143, 165, 144};
     Matrix AB(4, 4);
     AB.fill(z);
-    assertAndPrint(passMessage, testNo++, AB == C);
+    assertAndPrint(passMessage + std::to_string(testNo++), AB == C);
 
     A *= B;
-    assertAndPrint(passMessage, testNo++, A == C);
+    assertAndPrint(passMessage + std::to_string(testNo++), A == C);
 }
 
 void test_matrix_multiplication_more_rows()
@@ -142,10 +135,10 @@ void test_matrix_multiplication_more_rows()
                   105, 39};
     Matrix AB(5, 2);
     AB.fill(z);
-    assertAndPrint(passMessage, testNo++, AB == C);
+    assertAndPrint(passMessage + std::to_string(testNo++), AB == C);
 
     A *= B;
-    assertAndPrint(passMessage, testNo++, A == C);
+    assertAndPrint(passMessage + std::to_string(testNo++), A == C);
 
 }
 
@@ -171,10 +164,10 @@ void test_matrix_multiplication_more_cols()
                   151,  90, 71, 110, 114,};
     Matrix AB(2, 5);
     AB.fill(z);
-    assertAndPrint(passMessage, testNo++, AB == C);
+    assertAndPrint(passMessage + std::to_string(testNo++), AB == C);
 
     A *= B;
-    assertAndPrint(passMessage, testNo++, A == C);
+    assertAndPrint(passMessage + std::to_string(testNo++), A == C);
 
 }
 
@@ -204,7 +197,7 @@ void test_inverse()
     B.fill(y);
     
     Matrix::setEqualityPrecision(0.000001f);
-    assertAndPrint(passMessage, testNo, inv == B);
+    assertAndPrint(passMessage + std::to_string(testNo++), inv == B);
 
     Matrix::setEqualityPrecision(0.0f);
 }
@@ -221,7 +214,7 @@ void test_determinant()
                   4,  2,  4, 7,  3};
     Matrix A(5, 5);
     A.fill(x);
-    assertAndPrint(passMessage, testNo++, (int)A.determinant() == -5399);
+    assertAndPrint(passMessage + std::to_string(testNo++), (int)A.determinant() == -5399);
 
     double y[] = {-5.2, 1.0,  3.0,  7.2,
                    8.2, 7.0, -8.0, -7.3,
@@ -230,7 +223,7 @@ void test_determinant()
 
     Matrix B(4, 4);
     B.fill(y);
-    assertAndPrint(passMessage, testNo++, (int)(B.determinant() * 100) == (int)(-11130.32 * 100)); 
+    assertAndPrint(passMessage + std::to_string(testNo++), (int)(B.determinant() * 100) == (int)(-11130.32 * 100)); 
 }
 
 void test_adjoint()
@@ -258,7 +251,7 @@ void test_adjoint()
     Matrix B(5, 5);
     B.fill(y);
     
-    assertAndPrint(passMessage, testNo, adj == B);
+    assertAndPrint(passMessage + std::to_string(testNo++), adj == B);
  
 }
 
@@ -290,7 +283,7 @@ void test_solve_system_with_jacobi()
 
     Matrix::setEqualityPrecision(0.00001f);
 
-    assertAndPrint(passMessage, testNo++, A * x == B);
+    assertAndPrint(passMessage + std::to_string(testNo++), A * x == B);
 
     Matrix::setEqualityPrecision(0.0f);
 }
@@ -320,7 +313,7 @@ void test_solve_system_with_failsafe()
 
     Matrix::setEqualityPrecision(0.00001f);
 
-    assertAndPrint(passMessage, testNo++, A * x == B);
+    assertAndPrint(passMessage + std::to_string(testNo++), A * x == B);
 
     Matrix::setEqualityPrecision(0.0f);
 }
@@ -335,7 +328,7 @@ void segfault_printer(int dummy)
 
 void runTests() 
 {
-    assertAndPrint("\n---Now running all test cases...", 0, 0);
+    assertAndPrint("\n---Now running all test cases...", true);
     test_equality();
     test_inequality();
     test_matrix_multiplication_same_size();
@@ -346,7 +339,7 @@ void runTests()
     test_adjoint();
     //test_solve_system_with_jacobi(); // DO NOT RUN WITH MULTIPLE PROCESSES
     test_solve_system_with_failsafe();
-    assertAndPrint("---All tests have passed!", 0, 0);
+    assertAndPrint("---All tests have passed!", true);
 }
 
 int main(int argc, char* argv[])

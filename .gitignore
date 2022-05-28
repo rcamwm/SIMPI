@@ -5,7 +5,8 @@
 .gdbinit
 # object files
 mpi
-tests
+test_cases
+test_times
 user
 Simpi
 Matrix

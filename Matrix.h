@@ -35,9 +35,9 @@ namespace SimpiNS
             void jacobiRestoreInputs(int start, int end, Matrix &saveEq, Matrix &constants, Matrix &saveConst);
 
             // algebra helper functions
-            void determineEquality(Matrix &comparand, int start, int end, bool rowGreaterThanCol, bool* eqValue);
+            void determineEquality(Matrix &comparand, int start, int end, bool moreRows, bool* eqValue);
             bool *getSharedBool(int &fd);
-            void calculateProduct(Matrix &B, Matrix* C, int start, int end, bool rowGreaterThanCol);
+            void calculateProduct(Matrix &B, Matrix* C, int start, int end, bool moreRows);
 
         public:
             static void setSimpi(Simpi *s);
