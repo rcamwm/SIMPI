@@ -60,36 +60,16 @@ namespace SimpiNS
         rows = m.rows;
         cols = m.cols;
 
-        // Processes divide the rows if there are more rows, and divide the columns if not
-        bool moreRows = rows > cols;
-        int div = (moreRows) ? rows : cols; // Number of lines to divide between processes
+        int cellCount = rows * cols;
+        int indices[4];
+        singleCellWorkDivision(cellCount, indices);
 
-        int processCount = mainSimpi->getProcessCount();
-        int processID = mainSimpi->getID();
+        for (int i = indices[0]; i < indices[1]; i++) // Initial work
+            arr[i] = m.arr[i];
+        
+        for (int i = indices[2]; i < indices[3]; i++) // Leftover work
+            arr[i] = m.arr[i];
 
-        if (div <= processCount)
-        {
-            int start = processID;
-            int end = start + 1;
-            if (processID < div)
-                copyElements(m, start, end, moreRows);
-        }
-        else 
-        {
-            int work = div / processCount;
-            int start = processID * work;
-            int end = start + work;
-            copyElements(m, start, end, moreRows);
-
-            int leftoverWork = div % processCount;
-            if (leftoverWork != 0)
-            {
-                start = (work * processCount) + processID;
-                end = start + 1;
-                if (processID < leftoverWork)
-                    copyElements(m, start, end, moreRows);
-            }         
-        }
         mainSimpi->synch();
     }
 
@@ -102,26 +82,56 @@ namespace SimpiNS
     }
 
     /**
-     * Copies all values in the double array from another Matrix
-     * into the double array of this Matrix, in the same order. 
+     * This function divides work between processes for functions that work on
+     * cells in a Matrix individually. This does not work for all functions.
+     * Some use algorithms that calculate results for certain elements based on the results
+     * of previously calculated elements. This is only intended for use with functions
+     * where an element's result is completely independent from all other elements.
      * 
-     * @param m the Matrix that values are being copied from
-     * @param start the first row or column index for this process to work on
-     * @param end the last row or column index for this process to work on
-     * @param moreRows determines if the processes will divide rows or cols
+     * @param cellCount The number of elements in the target Matrix object's double array
+     * @param indexArray an integer array of size 4 that stores the starting and ending indices 
+     *                   of the target Matrix object's double array to work on. 
+     *                   [0] and [1] are the starting and ending indices of work to do for this process 
+     *                   and will be -1 if there is no work to do. 
+     *                   [2] and [3] are the starting and ending indices of leftover work to do for this process 
+     *                   and will be -1 if there is no leftover work to do.
      */
-    void Matrix::copyElements(const Matrix &m, int start, int end, bool moreRows)
+    void Matrix::singleCellWorkDivision(int cellCount, int indexArray[])
     {
-        int rowStart, rowEnd, colStart, colEnd;
-        if (moreRows) { rowStart = start, rowEnd = end, colStart = 0, colEnd = cols; }
-        else { rowStart = 0, rowEnd = rows, colStart = start, colEnd = end; }
-
-        for (int row = rowStart; row < rowEnd; row++)
+        int processCount = mainSimpi->getProcessCount();
+        int processID = mainSimpi->getID();
+        if (cellCount <= processCount) // More processes than cells => each process gets one cell
         {
-            for (int col = colStart; col < colEnd; col++)
+            if (processID < cellCount) 
             {
-                getRef(row, col) = m.getVal(row, col);
+                indexArray[0] = processID;
+                indexArray[1] = processID + 1;
             }
+            else
+            {
+                indexArray[0] = -1;
+                indexArray[1] = -1;
+            }
+            indexArray[2] = -1;
+            indexArray[3] = -1;
+        }
+        else // Otherwise, evenly distribute initial and leftover work between processes
+        {
+            int work = cellCount / processCount;
+            indexArray[0] = processID * work;
+            indexArray[1] = indexArray[0] + work;
+
+            int leftoverWork = cellCount % processCount;
+            if (leftoverWork != 0 && processID < leftoverWork)
+            {
+                indexArray[2] = (work * processCount) + processID;
+                indexArray[3] = indexArray[2] + 1;
+            }    
+            else
+            {
+                indexArray[2] = -1;
+                indexArray[3] = -1;
+            }     
         }
     }
 
@@ -939,54 +949,55 @@ namespace SimpiNS
      */
     bool Matrix::equals(Matrix &B)
     {
-        if (rows != B.rows || cols != B.cols)
+        Matrix *A = this;
+        if (A->rows != B.rows || A->cols != B.cols)
             return false;
             
         int fd;
-        bool *equalityBool = getSharedBool(fd); // Shared between all processes so the same value is always returned
+        std::string sharedMemoryName = "TEMP_SHARED_BOOL_FOR_EQUALITY_CHECK";
+        bool *equalityBool = getSharedBool(fd, sharedMemoryName); // Shared between all processes so the same value is always returned
         *equalityBool = true;
         mainSimpi->synch();
 
-        // Processes divide the rows if matrices have more rows, and divide the columns if not
-        bool moreRows = rows > cols;
-        int div = (moreRows) ? rows : cols; // Number of lines to divide between processes
-
-        int processCount = mainSimpi->getProcessCount();
-        int processID = mainSimpi->getID();
-
-        if (div <= processCount)
-        {
-            int start = processID;
-            int end = start + 1;
-            if (processID < div)
-                determineEquality(B, start, end, moreRows, equalityBool);
-        }
-        else 
-        {
-            int work = div / processCount;
-            int start = processID * work;
-            int end = start + work;
-            determineEquality(B, start, end, moreRows, equalityBool);
-
-            int leftoverWork = div % processCount;
-            if (leftoverWork != 0)
-            {
-                start = (work * processCount) + processID;
-                end = start + 1;
-                if (processID < leftoverWork)
-                    determineEquality(B, start, end, moreRows, equalityBool);
-            }         
-        }
+        int cellCount = A->rows * A->cols;
+        int indices[4];
+        singleCellWorkDivision(cellCount, indices);
+        determineEquality(B, indices[0], indices[1], equalityBool); // Initial work
+        determineEquality(B, indices[2], indices[3], equalityBool); // Leftover work
         mainSimpi->synch();
+
         bool eqValue = *equalityBool;
-        
         mainSimpi->synch();
+
         close(fd);
-        shm_unlink("TEMP_SHARED_BOOL_FOR_EQUALITY_CHECK");
+        shm_unlink(sharedMemoryName.c_str());
         munmap(equalityBool, sizeof(bool*));
         
         mainSimpi->synch();
         return eqValue;
+    }
+
+    /**
+     * Determines if A == B
+     * Compares all corresponding Matrix elements that have the same index.
+     * If an unequal set of elements is found the function will return false
+     * and force all other active processes to return false as well.
+     * 
+     * @param B the other Matrix being compared.
+     * @param start the first double array index of A and B for this process to work on
+     * @param end the last double array index of A and B for this process to work on
+     * @param eqValue shared boolean value between all active processes
+     */
+    void Matrix::determineEquality(Matrix &B, int start, int end, bool* eqValue)
+    {
+        Matrix *A = this;
+        for (int i = start; i < end; i++)
+        {
+            if (fabs(A->arr[i] - B.arr[i]) > equalityPrecision)
+                *eqValue = false;                    
+            if (!*eqValue)
+                return;
+        }
     }
 
     bool operator==(Matrix &lhs, Matrix &rhs)
@@ -1007,12 +1018,12 @@ namespace SimpiNS
      * 
      * @param fd file descriptor for shared boolean pointer
      */
-    bool* Matrix::getSharedBool(int &fd)
+    bool* Matrix::getSharedBool(int &fd, std::string sharedMemoryName)
     {
         bool *eq;
         if (mainSimpi->getID() == 0) 
         {
-            fd = shm_open("TEMP_SHARED_BOOL_FOR_EQUALITY_CHECK", O_RDWR | O_CREAT, 0777); 
+            fd = shm_open(sharedMemoryName.c_str(), O_RDWR | O_CREAT, 0777); 
             ftruncate(fd, sizeof(bool*));
             eq = (bool*)mmap(NULL, sizeof(bool*), PROT_READ | PROT_WRITE, MAP_SHARED, fd, 0);
             mainSimpi->synch();
@@ -1020,41 +1031,12 @@ namespace SimpiNS
         else 
         {
             mainSimpi->synch();
-            fd = shm_open("TEMP_SHARED_BOOL_FOR_EQUALITY_CHECK", O_RDWR, 0777);
+            fd = shm_open(sharedMemoryName.c_str(), O_RDWR, 0777);
             eq = (bool*)mmap(NULL, sizeof(bool*), PROT_READ | PROT_WRITE, MAP_SHARED, fd, 0);
         }
         return eq;
     }
 
-    /**
-     * Compares all corresponding Matrix elements that have the same (row, col).
-     * If an unequal set of elements is found the function will return false
-     * and force all other active processes to return false as well.
-     * 
-     * @param B the other Matrix being compared.
-     * @param start the first row or column index for this process to work on
-     * @param end the last row or column index for this process to work on
-     * @param moreRows determines if the processes will divide rows or cols
-     * @param eqValue shared boolean value between all active processes
-     */
-    void Matrix::determineEquality(Matrix &B, int start, int end, bool moreRows, bool* eqValue)
-    {
-        int rowStart, rowEnd, colStart, colEnd;
-        if (moreRows) { rowStart = start, rowEnd = end, colStart = 0, colEnd = cols; }
-        else { rowStart = 0, rowEnd = rows, colStart = start, colEnd = end; }
-
-        for (int row = rowStart; row < rowEnd; row++)
-        {
-            for (int col = colStart; col < colEnd; col++)
-            {
-                if (fabs(this->getVal(row, col) - B.getVal(row, col)) > equalityPrecision)
-                    *eqValue = false;                    
-                if (!*eqValue)
-                    return;                
-            }
-        }
-    }
-    
     /**
      * C = AB
      * Solves matrix multiplication in parallel and outputs the product solution.
@@ -1065,45 +1047,44 @@ namespace SimpiNS
      */
     Matrix &Matrix::multiply(Matrix &B)
     {
+        Matrix *A = this;
         if (cols != B.rows)
         {
-            printf("Cannot multiply matrices of sizes %dx%d and %dx%d", rows, cols, B.rows, B.cols); 
+            printf("Cannot multiply matrices of sizes %dx%d and %dx%d", A->rows, A->cols, B.rows, B.cols); 
             exit(1);
         }
-        Matrix *C = new Matrix(rows, B.cols);
+        Matrix *C = new Matrix(A->rows, B.cols);
+        int cellCount = C->rows * C->cols;
+        int indices[4];
+        singleCellWorkDivision(cellCount, indices);
+        calculateProduct(B, C, indices[0], indices[1]); // Initial work
+        calculateProduct(B, C, indices[2], indices[3]); // Leftover work
 
-        // Processes divide the rows if C has more rows, and divide the columns if not
-        bool moreRows = C->rows > C->cols;
-        int div = (moreRows) ? C->rows : C->cols; // Number of lines to divide between processes
-
-        int processCount = mainSimpi->getProcessCount();
-        int processID = mainSimpi->getID();
-
-        if (div <= processCount)
-        {
-            int start = processID;
-            int end = start + 1;
-            if (processID < div)
-                calculateProduct(B, C, start, end, moreRows);
-        }
-        else 
-        {
-            int work = div / processCount;
-            int start = processID * work;
-            int end = start + work;
-            calculateProduct(B, C, start, end, moreRows);
-
-            int leftoverWork = div % processCount;
-            if (leftoverWork != 0)
-            {
-                start = (work * processCount) + processID;
-                end = start + 1;
-                if (processID < leftoverWork)
-                    calculateProduct(B, C, start, end, moreRows);
-            }         
-        }
         mainSimpi->synch();
         return *C;
+    }
+
+    /**
+     * Calculates C = A * B 
+     * 
+     * @param B the Matrix being multiplied with this Matrix (A)
+     * @param C the resulting Matrix that the solution is being written into
+     * @param start the first double array index of C for this process to work on
+     * @param end the last double array index of C for this process to work on
+     */
+    void Matrix::calculateProduct(Matrix &B, Matrix* C, int start, int end)
+    {
+        Matrix *A = this; // For clarity
+        for (int i = start; i < end; i++)
+        {
+            C->arr[i] = 0;
+            int row = C->getRow(i);
+            int col = C->getCol(i);
+            for (int offset = 0; offset < B.rows; offset++) // A->col and B.rows are the same
+            {
+                C->getRef(row, col) += A->getVal(row, offset) * B.getVal(offset, col);
+            }
+        }
     }
 
     Matrix &operator*(Matrix &lhs, Matrix &rhs)
@@ -1117,37 +1098,6 @@ namespace SimpiNS
     }
 
     /**
-     * Calculates C = A * B 
-     * 
-     * @param B the Matrix being multiplied with this Matrix (A)
-     * @param C the resulting Matrix that the solution is being written into
-     * @param start the first row or column index for this process to work on
-     * @param end the last row or column index for this process to work on
-     * @param moreRows determines if the processes will divide rows or cols
-     */
-    void Matrix::calculateProduct(Matrix &B, Matrix* C, int start, int end, bool moreRows)
-    {
-        Matrix *A = this; // For clarity
-
-        // Processes divide the rows if C has more rows, and divide the columns if not
-        int rowStart, rowEnd, colStart, colEnd;
-        if (moreRows) { rowStart = start, rowEnd = end, colStart = 0, colEnd = C->cols; }
-        else { rowStart = 0, rowEnd = C->rows, colStart = start, colEnd = end; }
-
-        for (int row = rowStart; row < rowEnd; row++)
-        {
-            for (int col = colStart; col < colEnd; col++)
-            {
-                C->getRef(row, col) = 0;
-                for (int offset = 0; offset < B.rows; offset++) // A->col == B.rows
-                {
-                    C->getRef(row, col) += A->getVal(row, offset) * B.getVal(offset, col);
-                }
-            }
-        }
-    }
-
-    /**
      * ATimesLambda = A * lambda
      * Solves scalar multiplication in parallel and outputs the product solution.
      * 
@@ -1156,38 +1106,19 @@ namespace SimpiNS
      */
     Matrix &Matrix::scalarMultiply(double lambda)
     {
+        Matrix *A = this;
         Matrix *ATimesLambda = new Matrix(rows, cols);
 
-        // Processes divide the rows if there are more rows, and divide the columns if not
-        bool moreRows = rows > cols;
-        int div = (moreRows) ? rows : cols; // Number of lines to divide between processes
+        int cellCount = ATimesLambda->rows * ATimesLambda->cols;
+        int indices[4];
+        singleCellWorkDivision(cellCount, indices);
 
-        int processCount = mainSimpi->getProcessCount();
-        int processID = mainSimpi->getID();
+        for (int i = indices[0]; i < indices[1]; i++) // Initial work
+            ATimesLambda->arr[i] = A->arr[i] * lambda;
 
-        if (div <= processCount)
-        {
-            int start = processID;
-            int end = start + 1;
-            if (processID < div)
-                calculateScalarProduct(lambda, ATimesLambda, start, end, moreRows);
-        }
-        else 
-        {
-            int work = div / processCount;
-            int start = processID * work;
-            int end = start + work;
-            calculateScalarProduct(lambda, ATimesLambda, start, end, moreRows);
+        for (int i = indices[2]; i < indices[3]; i++) // Leftover work
+            ATimesLambda->arr[i] = A->arr[i] * lambda;
 
-            int leftoverWork = div % processCount;
-            if (leftoverWork != 0)
-            {
-                start = (work * processCount) + processID;
-                end = start + 1;
-                if (processID < leftoverWork)
-                    calculateScalarProduct(lambda, ATimesLambda, start, end, moreRows);
-            }         
-        }
         mainSimpi->synch();
         return *ATimesLambda;
     }
@@ -1208,31 +1139,6 @@ namespace SimpiNS
     }
 
     /**
-     * Calculates ATimesLambda = A * lambda
-     * 
-     * @param lambda scalar value that this Matrix (A) is being multiplied with.
-     * @param ATimesLambda the resulting Matrix that the solution is being written into
-     * @param start the first row or column index for this process to work on
-     * @param end the last row or column index for this process to work on
-     * @param moreRows determines if the processes will divide rows or cols
-     */
-    void Matrix::calculateScalarProduct(double lambda, Matrix* ATimesLambda, int start, int end, bool moreRows)
-    {
-        // Processes divide the rows if there are more rows, and divide the columns if not
-        int rowStart, rowEnd, colStart, colEnd;
-        if (moreRows) { rowStart = start, rowEnd = end, colStart = 0, colEnd = cols; }
-        else { rowStart = 0, rowEnd = rows, colStart = start, colEnd = end; }
-
-        for (int row = rowStart; row < rowEnd; row++)
-        {
-            for (int col = colStart; col < colEnd; col++)
-            {
-                ATimesLambda->getRef(row, col) = getVal(row, col) * lambda;
-            }
-        }
-    }
-
-    /**
      * C = A + B
      * Solves matrix addition in parallel and outputs the product solution.
      * 
@@ -1241,38 +1147,19 @@ namespace SimpiNS
      */
     Matrix &Matrix::add(Matrix &B)
     {
+        Matrix *A = this;
         Matrix *C = new Matrix(rows, cols);
 
-        // Processes divide the rows if there are more rows, and divide the columns if not
-        bool moreRows = rows > cols;
-        int div = (moreRows) ? rows : cols; // Number of lines to divide between processes
+        int cellCount = C->rows * C->cols;
+        int indices[4];
+        singleCellWorkDivision(cellCount, indices);
 
-        int processCount = mainSimpi->getProcessCount();
-        int processID = mainSimpi->getID();
+        for (int i = indices[0]; i < indices[1]; i++) // Initial work
+            C->arr[i] = A->arr[i] + B.arr[i];
 
-        if (div <= processCount)
-        {
-            int start = processID;
-            int end = start + 1;
-            if (processID < div)
-                calculateSum(B, C, start, end, moreRows);
-        }
-        else 
-        {
-            int work = div / processCount;
-            int start = processID * work;
-            int end = start + work;
-            calculateSum(B, C, start, end, moreRows);
+        for (int i = indices[2]; i < indices[3]; i++) // Leftover work
+            C->arr[i] = A->arr[i] + B.arr[i];
 
-            int leftoverWork = div % processCount;
-            if (leftoverWork != 0)
-            {
-                start = (work * processCount) + processID;
-                end = start + 1;
-                if (processID < leftoverWork)
-                    calculateSum(B, C, start, end, moreRows);
-            }         
-        }
         mainSimpi->synch();
         return *C;
     }
@@ -1288,31 +1175,6 @@ namespace SimpiNS
     }
 
     /**
-     * Calculates C = A + B 
-     * 
-     * @param B the Matrix being added to this Matrix (A)
-     * @param C the resulting Matrix that the solution is being written into
-     * @param start the first row or column index for this process to work on
-     * @param end the last row or column index for this process to work on
-     * @param moreRows determines if the processes will divide rows or cols
-     */
-    void Matrix::calculateSum(const Matrix &B, Matrix* C, int start, int end, bool moreRows)
-    {
-        // Processes divide the rows if there are more rows, and divide the columns if not
-        int rowStart, rowEnd, colStart, colEnd;
-        if (moreRows) { rowStart = start, rowEnd = end, colStart = 0, colEnd = cols; }
-        else { rowStart = 0, rowEnd = rows, colStart = start, colEnd = end; }
-
-        for (int row = rowStart; row < rowEnd; row++)
-        {
-            for (int col = colStart; col < colEnd; col++)
-            {
-                C->getRef(row, col) = getVal(row, col) + B.getVal(row, col);
-            }
-        }
-    }
-
-    /**
      * C = A - B
      * Solves matrix addition in parallel and outputs the product solution.
      * 
@@ -1321,38 +1183,19 @@ namespace SimpiNS
      */
     Matrix &Matrix::subtract(Matrix &B)
     {
+        Matrix *A = this;
         Matrix *C = new Matrix(rows, cols);
 
-        // Processes divide the rows if there are more rows, and divide the columns if not
-        bool moreRows = rows > cols;
-        int div = (moreRows) ? rows : cols; // Number of lines to divide between processes
+        int cellCount = C->rows * C->cols;
+        int indices[4];
+        singleCellWorkDivision(cellCount, indices);
 
-        int processCount = mainSimpi->getProcessCount();
-        int processID = mainSimpi->getID();
+        for (int i = indices[0]; i < indices[1]; i++) // Initial work
+            C->arr[i] = A->arr[i] - B.arr[i];
 
-        if (div <= processCount)
-        {
-            int start = processID;
-            int end = start + 1;
-            if (processID < div)
-                calculateDifference(B, C, start, end, moreRows);
-        }
-        else 
-        {
-            int work = div / processCount;
-            int start = processID * work;
-            int end = start + work;
-            calculateDifference(B, C, start, end, moreRows);
-
-            int leftoverWork = div % processCount;
-            if (leftoverWork != 0)
-            {
-                start = (work * processCount) + processID;
-                end = start + 1;
-                if (processID < leftoverWork)
-                    calculateDifference(B, C, start, end, moreRows);
-            }         
-        }
+        for (int i = indices[2]; i < indices[3]; i++) // Leftover work
+            C->arr[i] = A->arr[i] - B.arr[i];
+            
         mainSimpi->synch();
         return *C;
     }
@@ -1368,31 +1211,6 @@ namespace SimpiNS
     }
 
     /**
-     * Calculates C = A - B 
-     * 
-     * @param B the Matrix being subtracted from this Matrix (A)
-     * @param C the resulting Matrix that the solution is being written into
-     * @param start the first row or column index for this process to work on
-     * @param end the last row or column index for this process to work on
-     * @param moreRows determines if the processes will divide rows or cols
-     */
-    void Matrix::calculateDifference(const Matrix &B, Matrix* C, int start, int end, bool moreRows)
-    {
-        // Processes divide the rows if there are more rows, and divide the columns if not
-        int rowStart, rowEnd, colStart, colEnd;
-        if (moreRows) { rowStart = start, rowEnd = end, colStart = 0, colEnd = cols; }
-        else { rowStart = 0, rowEnd = rows, colStart = start, colEnd = end; }
-
-        for (int row = rowStart; row < rowEnd; row++)
-        {
-            for (int col = colStart; col < colEnd; col++)
-            {
-                C->getRef(row, col) = getVal(row, col) - B.getVal(row, col);
-            }
-        }
-    }
-
-    /**
      * A^T 
      * Returns the transpose of this Matrix (A).
      * The tranpose of a matrix is one in which its row and col indices are switched,
@@ -1401,38 +1219,15 @@ namespace SimpiNS
      */
     Matrix &Matrix::transpose()
     {
-        Matrix *A_T = new Matrix(cols, rows);
+        Matrix *A = this;
+        Matrix *A_T = new Matrix(A->cols, A->rows);
 
-        // Processes divide the rows if there are more rows, and divide the columns if not
-        bool moreRows = rows > cols;
-        int div = (moreRows) ? rows : cols; // Number of lines to divide between processes
+        int cellCount = A->rows * A->cols;
+        int indices[4];
+        singleCellWorkDivision(cellCount, indices);
+        calculateTranspose(A_T, indices[0], indices[1]); // Initial work
+        calculateTranspose(A_T, indices[2], indices[3]); // Leftover work
 
-        int processCount = mainSimpi->getProcessCount();
-        int processID = mainSimpi->getID();
-
-        if (div <= processCount)
-        {
-            int start = processID;
-            int end = start + 1;
-            if (processID < div)
-                calculateTranspose(A_T, start, end, moreRows);
-        }
-        else 
-        {
-            int work = div / processCount;
-            int start = processID * work;
-            int end = start + work;
-            calculateTranspose(A_T, start, end, moreRows);
-
-            int leftoverWork = div % processCount;
-            if (leftoverWork != 0)
-            {
-                start = (work * processCount) + processID;
-                end = start + 1;
-                if (processID < leftoverWork)
-                    calculateTranspose(A_T, start, end, moreRows);
-            }         
-        }
         mainSimpi->synch();
         return *A_T;
     }
@@ -1441,23 +1236,17 @@ namespace SimpiNS
      * Calculates A^T
      * 
      * @param A_T the resulting Matrix that the solution is being written into
-     * @param start the first row or column index for this process to work on
-     * @param end the last row or column index for this process to work on
-     * @param moreRows determines if the processes will divide rows or cols
+     * @param start the first double array index of A_T for this process to work on
+     * @param end the last double array index of A_T for this process to work on
      */
-    void Matrix::calculateTranspose(Matrix* A_T, int start, int end, bool moreRows)
+    void Matrix::calculateTranspose(Matrix* A_T, int start, int end)
     {
-        // Processes divide the rows if there are more rows, and divide the columns if not
-        int rowStart, rowEnd, colStart, colEnd;
-        if (moreRows) { rowStart = start, rowEnd = end, colStart = 0, colEnd = cols; }
-        else { rowStart = 0, rowEnd = rows, colStart = start, colEnd = end; }
-
-        for (int row = rowStart; row < rowEnd; row++)
+        Matrix *A = this;
+        for (int i = start; i < end; i++)
         {
-            for (int col = colStart; col < colEnd; col++)
-            {
-                A_T->getRef(col, row) = getVal(row, col);
-            }
+            int rowA = A->getRow(i);
+            int colA = A->getCol(i);
+            A_T->getRef(colA, rowA) = A->getVal(rowA, colA);
         }
     }
 

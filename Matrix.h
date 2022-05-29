@@ -20,7 +20,7 @@ namespace SimpiNS
             static int printPrecision;
 
             void initializeArrayToZero(double *A, int size);
-            void copyElements(const Matrix &m, int start, int end, bool moreRows);
+            void singleCellWorkDivision(int cellCount, int startEnd[]);
 
             // determinate() and adjoint() helper functions
             double calculateDeterminant(double* A, int n, int order);
@@ -36,13 +36,10 @@ namespace SimpiNS
             void jacobiRestoreInputs(int start, int end, Matrix &saveEq, Matrix &B, Matrix &saveB);
 
             // algebra helper functions
-            void determineEquality(Matrix &B, int start, int end, bool moreRows, bool* eqValue);
-            bool *getSharedBool(int &fd);
-            void calculateProduct(Matrix &B, Matrix* C, int start, int end, bool moreRows);
-            void calculateScalarProduct(double lambda, Matrix* ATimesLambda, int start, int end, bool moreRows);
-            void calculateSum(const Matrix &B, Matrix* C, int start, int end, bool moreRows);
-            void calculateDifference(const Matrix &B, Matrix* C, int start, int end, bool moreRows);
-            void calculateTranspose(Matrix* A_T, int start, int end, bool moreRows);
+            void determineEquality(Matrix &B, int start, int end, bool* eqValue);
+            bool *getSharedBool(int &fd, std::string sharedMemoryName);
+            void calculateProduct(Matrix &B, Matrix* C, int start, int end);
+            void calculateTranspose(Matrix* A_T, int start, int end);
 
         public:
             static void setSimpi(Simpi *s);
@@ -58,6 +55,8 @@ namespace SimpiNS
             int getCols() { return cols; }
             double& getRef(int row, int col) { return arr[row + (col * rows)]; }
             double getVal(int row, int col) const { return arr[row + (col * rows)]; }
+            int getRow(int index) { return index % rows; }
+            int getCol(int index) { return index / rows; }
             bool isSquareMatrix() { return rows == cols; }
             void fill(double *fillArray);
             void fillRandom(int min, int max);
