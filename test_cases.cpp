@@ -41,7 +41,7 @@ void test_equality()
     B.fill(x);
     assertAndPrint(passMessage + std::to_string(testNo++), A == B);
 
-    B.get(2, 2) += 0.001;
+    B.getRef(2, 2) += 0.001;
     assertAndPrint(passMessage + std::to_string(testNo++), !(A == B));
 
     double y[] = {1, 2, 3, 4, 5, 6, 7, 8, 9}; 
@@ -68,12 +68,28 @@ void test_inequality()
     assertAndPrint(passMessage + std::to_string(testNo++), A != B);
 
     if (processID == 0)
-        for (int i = 0; i < B.getCols(); i++) { B.get(i, i) *= 10; }
+        for (int i = 0; i < B.getCols(); i++) { B.getRef(i, i) *= 10; }
     mainSimpi->synch();
     assertAndPrint(passMessage + std::to_string(testNo++), !(A != B));
 
     Matrix C(2, 3);
     assertAndPrint(passMessage + std::to_string(testNo++), B != C);
+}
+
+void test_copy_constructor()
+{
+    std::string passMessage = "test_copy_constructor() passes test ";
+    int testNo = 1;
+    double x[] = {1, 2, 3,
+                  4, 5, 6,
+                  7, 8, 9};
+    Matrix A(3, 3);
+    A.fill(x);
+    Matrix B = A;
+    assertAndPrint(passMessage + std::to_string(testNo++), A == B);
+
+    B.getRef(2,2) += 1;
+    assertAndPrint(passMessage + std::to_string(testNo++), A != B);
 }
 
 void test_matrix_multiplication_same_size()
@@ -331,6 +347,7 @@ void runTests()
     assertAndPrint("\n---Now running all test cases...", true);
     test_equality();
     test_inequality();
+    test_copy_constructor();
     test_matrix_multiplication_same_size();
     test_matrix_multiplication_more_rows();
     test_matrix_multiplication_more_cols();

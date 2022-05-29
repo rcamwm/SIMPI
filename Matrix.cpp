@@ -41,9 +41,65 @@ namespace SimpiNS
         cols = colCount;
     }
 
+    Matrix::Matrix(const Matrix &m)
+    {
+        std::pair<std::string, double*> passBack(mainSimpi->createMatrix(m.rows, m.cols));
+        uniqueID = passBack.first;
+        arr = passBack.second;
+        rows = m.rows;
+        cols = m.cols;
+
+        // Processes divide the rows if C has more rows, and divide the columns if not
+        bool moreRows = rows > cols;
+        int div = (moreRows) ? rows : cols; // Number of lines to divide between processes
+
+        int processCount = mainSimpi->getProcessCount();
+        int processID = mainSimpi->getID();
+
+        if (div <= processCount)
+        {
+            int start = processID;
+            int end = start + 1;
+            if (processID < div)
+                copyElements(m, start, end, moreRows);
+        }
+        else 
+        {
+            int work = div / processCount;
+            int start = processID * work;
+            int end = start + work;
+            copyElements(m, start, end, moreRows);
+
+            int leftoverWork = div % processCount;
+            if (leftoverWork != 0)
+            {
+                start = (work * processCount) + processID;
+                end = start + 1;
+                if (processID < leftoverWork)
+                    copyElements(m, start, end, moreRows);
+            }         
+        }
+        mainSimpi->synch();
+    }
+
     Matrix::~Matrix()
     {
         mainSimpi->freeMatrix(uniqueID); // frees and unlinks memory
+    }
+
+    void Matrix::copyElements(const Matrix &m, int start, int end, bool moreRows)
+    {
+        int rowStart, rowEnd, colStart, colEnd;
+        if (moreRows) { rowStart = start, rowEnd = end, colStart = 0, colEnd = cols; }
+        else { rowStart = 0, rowEnd = rows, colStart = start, colEnd = end; }
+
+        for (int row = rowStart; row < rowEnd; row++)
+        {
+            for (int col = colStart; col < colEnd; col++)
+            {
+                getRef(row, col) = m.getVal(row, col);
+            }
+        }
     }
 
     /**
@@ -67,7 +123,7 @@ namespace SimpiNS
             {
                 for (int col = 0; col < cols; col++)
                 {
-                    get(row, col) = fillArray[i];
+                    getRef(row, col) = fillArray[i];
                     i++;
                 }
             }
@@ -86,7 +142,7 @@ namespace SimpiNS
             {
                 for (int col = 0; col < cols; col++)
                 {
-                    get(row, col) = distr(eng);
+                    getRef(row, col) = distr(eng);
                 }
             }
         }
@@ -291,10 +347,10 @@ namespace SimpiNS
                 // Summation of L(i, j) * U(j, k) 
                 float sum = 0;
                 for (int j = 0; j < i; j++) 
-                    sum += (lower->get(i, j) * upper->get(j, k)); 
+                    sum += (lower->getVal(i, j) * upper->getVal(j, k)); 
 
                 // Evaluating U(i, k) 
-                upper->get(i,k) = get(i,k) - sum; 
+                upper->getRef(i,k) = getVal(i,k) - sum; 
 
             }
 
@@ -312,10 +368,10 @@ namespace SimpiNS
                         // Summation of L(i, j) * U(j, k) 
                         float sum = 0;
                         for (int j = 0; j < i; j++) 
-                            sum += (lower->get(i, j) * upper->get(j, a));
+                            sum += (lower->getVal(i, j) * upper->getVal(j, a));
 
                         // Evaluating U(i, k) 
-                        upper->get(i, a) = get(i, a) - sum;
+                        upper->getRef(i, a) = getVal(i, a) - sum;
                     }
                 }
             }
@@ -333,15 +389,15 @@ namespace SimpiNS
                     break;
                 
                 if (i == k)
-                    lower->get(i, i) = 1; // Diagonal as 1 
+                    lower->getRef(i, i) = 1; // Diagonal as 1 
                 else 
                 {
                     // Summation of L(k, j) * U(j, i)
                     float sum = 0;
                     for (int j = 0; j < i; j++) 
-                    sum += (lower->get(k, j) * upper->get(j, i));
+                    sum += (lower->getVal(k, j) * upper->getVal(j, i));
                     // Evaluating L(k, i)
-                    lower->get(k, i) = ((get(k, i) - sum) / upper->get(i, i));
+                    lower->getRef(k, i) = ((getVal(k, i) - sum) / upper->getVal(i, i));
                 }
             }
 
@@ -357,16 +413,16 @@ namespace SimpiNS
                     for (int a = start; a < end; a++) 
                     {
                         if (i == a)
-                            lower->get(i, i) = 1; // Diagonal as 1
+                            lower->getRef(i, i) = 1; // Diagonal as 1
                         else 
                         {
                             // Summation of L(k, j) * U(j, i) 
                             float sum = 0;
                             for (int j = 0; j < i; j++) 
-                            sum += (lower->get(a, j) * upper->get(j, i));
+                            sum += (lower->getVal(a, j) * upper->getVal(j, i));
 
                             // Evaluating L(k, i) 
-                            lower->get(a, i) = (get(a, i)-sum) / upper->get(i, i);
+                            lower->getRef(a, i) = (getVal(a, i)-sum) / upper->getVal(i, i);
                         }
                     }
                 }
@@ -405,7 +461,7 @@ namespace SimpiNS
             for (int i = 0; i<getRows(); i++) 
             {
                 for (int j = 0; j<getRows(); j++)            
-                    (i == j) ? identity->get(i,j) = 1 : identity->get(i,j) = 0; 
+                    (i == j) ? identity->getRef(i,j) = 1 : identity->getRef(i,j) = 0; 
             }
         }
 
@@ -430,7 +486,7 @@ namespace SimpiNS
         {
             //Get individual columns of identity Matrix
             for (int b = 0; b < getRows(); b++)         
-                identityCol[b] = identity->get(b,a);
+                identityCol[b] = identity->getVal(b,a);
             
             //Reset Z column to solve for again
             for (int d = 0; d<getRows(); d++)
@@ -448,7 +504,7 @@ namespace SimpiNS
 
             //Input X column to corresponding columnn in final inverse Matrix
             for (int c = 0; c < getRows(); c++)
-                inv.get(c,a) = solutionCol[c];
+                inv.getRef(c,a) = solutionCol[c];
         }
 
         // Calculate and execute which processes take the leftover rows 
@@ -470,7 +526,7 @@ namespace SimpiNS
                 {
                     //Get individual columns of identity Matrix
                     for (int b = 0; b < getRows(); b++)
-                        identityCol[b] = identity->get(b, a);
+                        identityCol[b] = identity->getVal(b, a);
                     
                     //Reset Z column to solve for again
                     for (int d = 0; d < getRows(); d++) 
@@ -488,7 +544,7 @@ namespace SimpiNS
 
                     //Input X column to corresponding columnn in final inverse Matrix
                     for (int c = 0; c < getRows(); c++) 
-                        inv.get(c, a) = solutionCol[c];
+                        inv.getRef(c, a) = solutionCol[c];
                     
                 }
             }
@@ -508,9 +564,9 @@ namespace SimpiNS
         {
             suma = 0;
             for(int j = 0; j < i; j = j + 1)
-                suma = suma + get(i,j) * x[j];
+                suma = suma + getVal(i,j) * x[j];
 
-            x[i] = (b[i] - suma) / get(i, i);
+            x[i] = (b[i] - suma) / getVal(i, i);
         }
     }
 
@@ -524,9 +580,9 @@ namespace SimpiNS
         {
             suma=0;
             for(int j = getRows() - 1; j > i; j = j - 1)
-                suma = suma + get(i, j) * x[j];
+                suma = suma + getVal(i, j) * x[j];
     
-            x[i] = (b[i] - suma) / get(i, i);
+            x[i] = (b[i] - suma) / getVal(i, i);
         }
     }
 
@@ -628,10 +684,10 @@ namespace SimpiNS
         for (int i = start; i < end; i++) 
         {
             for (int j = 0; j < getCols(); j++) 
-                saveEq.get(i,j) = get(i, j);
+                saveEq.getRef(i,j) = getVal(i, j);
 
-            saveEq.get(i,getCols() + 1) = constants.get(i, 0);
-            saveConst.get(i, 0) = constants.get(i, 0);
+            saveEq.getRef(i,getCols() + 1) = constants.getVal(i, 0);
+            saveConst.getRef(i, 0) = constants.getVal(i, 0);
         }
     }
 
@@ -644,19 +700,19 @@ namespace SimpiNS
     {
         for (int i = start; i < end; i++) 
         {
-            double temp = get(i, i);
-            get(i, i) = constants.get(i, 0);
-            constants.get(i, 0) = temp;
+            double temp = getVal(i, i);
+            getRef(i, i) = constants.getVal(i, 0);
+            constants.getRef(i, 0) = temp;
             for (int j = 0; j < getCols(); j++) 
             {
                 if (j != i)
-                    get(i, j) *= -1;
+                    getRef(i, j) *= -1;
         
-                get(i, j) /= constants.get(i, 0);
+                getRef(i, j) /= constants.getVal(i, 0);
                 //mainSimpi->synch();
             }
-            prev.get(i, 0) = 1.0;
-            solution.get(i, 0) = constants.get(i, 0);
+            prev.getRef(i, 0) = 1.0;
+            solution.getRef(i, 0) = constants.getVal(i, 0);
             mainSimpi->synch();
         }
         mainSimpi->synchExtraCycles(synchOffset);
@@ -670,13 +726,13 @@ namespace SimpiNS
             for (int j = 0; j < getCols(); j++) 
             {
                 if (j == i)
-                    rowSum += get(i, j);
+                    rowSum += getVal(i, j);
                 else
-                    rowSum += (get(i, j) * prev.get(j, 0));
+                    rowSum += (getVal(i, j) * prev.getVal(j, 0));
                 
                 //mainSimpi->synch();
             }
-            solution.get(i, 0) = rowSum;
+            solution.getRef(i, 0) = rowSum;
             mainSimpi->synch();
         }
         mainSimpi->synchExtraCycles(synchOffset);
@@ -689,7 +745,7 @@ namespace SimpiNS
             for (int i = start; i < end; i++)
             {
                 //save prev value for comparision
-                prev.get(i, 0) = solution.get(i, 0);
+                prev.getRef(i, 0) = solution.getVal(i, 0);
                 mainSimpi->synch();
             }
             mainSimpi->synchExtraCycles(synchOffset);
@@ -699,12 +755,12 @@ namespace SimpiNS
                 for (int j = 0; j < getCols(); j++)
                 {
                     if (j == i) {
-                        rowSum += get(i, j);
+                        rowSum += getVal(i, j);
                     } else {
-                        rowSum += (get(i, j) * prev.get(j, 0));
+                        rowSum += (getVal(i, j) * prev.getVal(j, 0));
                     }
                 }
-                solution.get(i, 0) = rowSum;
+                solution.getRef(i, 0) = rowSum;
                 //mainSimpi->synch();
             }
             //wait at end of each loop for all processes before beginning next iteration
@@ -717,9 +773,9 @@ namespace SimpiNS
         for (int i = start; i < end; i++) 
         {
             for (int j = 0; j < getCols(); j++) 
-                get(i, j) = saveEq.get(i,j);
+                getRef(i, j) = saveEq.getVal(i,j);
             
-            constants.get(i, 0) = saveConst.get(i, 0);
+            constants.getRef(i, 0) = saveConst.getVal(i, 0);
         }
     }
 
@@ -756,9 +812,9 @@ namespace SimpiNS
             sol = 0;
             for(int j = 0; j < vectorSize; j++)
             {
-                sol += (inv->get(i, j) * constants.get(j, 0));
+                sol += (inv->getVal(i, j) * constants.getVal(j, 0));
             }
-            solution.get(i, 0) = sol;
+            solution.getRef(i, 0) = sol;
         }
         mainSimpi->synch();
         return;
@@ -779,7 +835,7 @@ namespace SimpiNS
             double sq;
             double rest = 0;
             for(int j = 0; j < getCols(); j++)
-                (i == j) ? sq = get(i, j) : rest += get(i,j);
+                (i == j) ? sq = getVal(i, j) : rest += getVal(i,j);
             
             if (sq < rest)
                 return false;
@@ -884,7 +940,7 @@ namespace SimpiNS
         {
             for (int col = colStart; col < colEnd; col++)
             {
-                if (fabs(this->get(row, col) - comparand.get(row, col)) > equalityPrecision)
+                if (fabs(this->getVal(row, col) - comparand.getVal(row, col)) > equalityPrecision)
                     *eqValue = false;                    
                 if (!*eqValue)
                     return;                
@@ -966,10 +1022,10 @@ namespace SimpiNS
         {
             for (int col = colStart; col < colEnd; col++)
             {
-                C->get(row, col) = 0;
+                C->getRef(row, col) = 0;
                 for (int offset = 0; offset < B.rows; offset++) // A->col == B.rows
                 {
-                    C->get(row, col) += A->get(row, offset) * B.get(offset, col);
+                    C->getRef(row, col) += A->getVal(row, offset) * B.getVal(offset, col);
                 }
             }
         }

@@ -15,26 +15,25 @@ int processID;
 Simpi *mainSimpi;
 clock_t mainClock;
 
-const int X = 13;
-const int Y = 13;
+const int ROWS = 10;
+const int COLS = 10;
 
 void record(std::string message, bool includeTime)
 {
-    clock_t total = (double)(std::clock() - mainClock) / CLOCKS_PER_SEC;
+    double total = (double)(std::clock() - mainClock) / CLOCKS_PER_SEC;
     if (mainSimpi->getID() == 0)
     {
-        std::cout << message;
         if (includeTime)
-            std::cout << "completed in " << total << " seconds";
-        std::cout << std::endl;
+            std::cout << total << " seconds: ";
+        std::cout << message << std::endl;;
     }
 }
 
 void test_equality()
 {
-    std::string passMessage = "test_equality() ";
+    std::string passMessage = "test_equality()";
 
-    Matrix A(X, Y);
+    Matrix A(ROWS, COLS);
     A.fillRandom(-50, 50);
     Matrix B = A;
 
@@ -43,13 +42,24 @@ void test_equality()
     record(passMessage, true);
 }
 
+void test_copy_constructor()
+{
+    std::string passMessage = "test_copy_constructor()";
+    Matrix A(ROWS, COLS);
+    A.fillRandom(-50, 50);
+
+    mainClock = std::clock();
+    Matrix B = A;
+    record(passMessage, true); 
+}
+
 void test_matrix_multiplication()
 {
-    std::string passMessage = "test_matrix_multiplication() ";
+    std::string passMessage = "test_matrix_multiplication()";
 
-    Matrix A(X, Y);
+    Matrix A(ROWS, COLS);
     A.fillRandom(-50, 50);
-    Matrix B(X, Y);
+    Matrix B(ROWS, COLS);
     B.fillRandom(-50, 50);
     
     mainClock = std::clock();
@@ -59,11 +69,11 @@ void test_matrix_multiplication()
 
 void test_inverse()
 {
-    std::string passMessage = "test_inverse() ";
+    std::string passMessage = "test_inverse()";
 
-    Matrix A(X, Y);
+    Matrix A(ROWS, COLS);
     A.fillRandom(-50, 50);
-    Matrix inv(X, Y);
+    Matrix inv(ROWS, COLS);
 
     mainClock = std::clock();
     A.inverse(inv);
@@ -75,9 +85,9 @@ void test_inverse()
 */
 void test_determinant()
 {
-    std::string passMessage = "test_determinant() ";
+    std::string passMessage = "test_determinant()";
 
-    Matrix A(X, Y);
+    Matrix A(ROWS, COLS);
     A.fillRandom(-50, 50);
     
     mainClock = std::clock();
@@ -87,11 +97,11 @@ void test_determinant()
 
 void test_adjoint()
 {
-    std::string passMessage = "test_adjoint() ";
+    std::string passMessage = "test_adjoint()";
    
-    Matrix A(X, Y);
+    Matrix A(ROWS, COLS);
     A.fillRandom(-50, 50);
-    Matrix adj(X, Y);
+    Matrix adj(ROWS, COLS);
 
     mainClock = std::clock();
     A.adjoint(adj);
@@ -103,17 +113,17 @@ void test_adjoint()
 */
 void test_solve_system_with_jacobi() 
 {
-    std::string passMessage = "test_solve_system_with_jacobi() ";
+    std::string passMessage = "test_solve_system_with_jacobi()";
     
-    Matrix A(X, Y);
+    Matrix A(ROWS, COLS);
     A.fillRandom(-50, 50);
-    for (int i = 0; i < X; i++) // Assuming X and Y have same value
-        A.get(i, i) *= 10; // To pass diagonal dominance test
+    for (int i = 0; i < ROWS; i++) // Assuming ROWS and COLS have same value
+        A.getRef(i, i) *= 10; // To pass diagonal dominance test
 
-    Matrix B(X, 1);
+    Matrix B(ROWS, 1);
     B.fillRandom(-50, 50);
 
-    Matrix x(X, 1);
+    Matrix x(ROWS, 1);
 
     mainClock = std::clock();
     A.solveSystem(x, B);
@@ -122,17 +132,17 @@ void test_solve_system_with_jacobi()
 
 void test_solve_system_with_failsafe()
 {
-    std::string passMessage = "test_solve_system_with_failsafe() ";
+    std::string passMessage = "test_solve_system_with_failsafe()";
 
-    Matrix A(X, Y);
+    Matrix A(ROWS, COLS);
     A.fillRandom(-50, 50);
-    for (int i = 0; i < X; i++) // Assuming X and Y have same value
-        A.get(i, i) /= 10; // To fail diagonal dominance test
+    for (int i = 0; i < ROWS; i++) // Assuming ROWS and COLS have same value
+        A.getRef(i, i) /= 10; // To fail diagonal dominance test
 
-    Matrix B(X, 1);
+    Matrix B(ROWS, 1);
     B.fillRandom(-50, 50);
 
-    Matrix x(X, 1);
+    Matrix x(ROWS, 1);
 
     mainClock = std::clock();
     A.solveSystem(x, B);
@@ -150,14 +160,16 @@ void segfault_printer(int dummy)
 void runTests() 
 {
     record("\n---Starting tests for " + std::to_string(mainSimpi->getProcessCount()) + " processes", false);
+    record("---Matrix rows = " + std::to_string(ROWS) + ", Matrix cols = " + std::to_string(COLS), false);
     test_equality();
+    test_copy_constructor();
     test_matrix_multiplication();
     test_inverse();
     // test_determinant(); // DO NOT RUN UNTIL ALGORITHM TAKES ADVANTAGE OF MULTUPLE PROCESSES
     test_adjoint();
     // test_solve_system_with_jacobi(); // DO NOT RUN WITH MULTIPLE PROCESSES
     test_solve_system_with_failsafe();
-    record("\n---Completed tests for " + std::to_string(mainSimpi->getProcessCount()) + " processes", false);
+    record("---Completed tests for " + std::to_string(mainSimpi->getProcessCount()) + " processes", false);
 }
 
 int main(int argc, char* argv[])

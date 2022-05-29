@@ -20,6 +20,7 @@ namespace SimpiNS
             static int printPrecision;
 
             void initializeArrayToZero(double *A, int size);
+            void copyElements(const Matrix &m, int start, int end, bool moreRows);
 
             // determinate() and adjoint() helper functions
             double calculateDeterminant(double* A, int n, int order);
@@ -45,12 +46,14 @@ namespace SimpiNS
             static void setPrintPrecision(int p);
 
             Matrix(int rowCount, int colCount);
+            Matrix(const Matrix &m);
             ~Matrix();
 
             int getSimpiID() const { return mainSimpi->getID(); }
             int getRows() { return rows; }
             int getCols() { return cols; }
-            double& get(int row, int col) { return arr[row + (col * rows)]; }
+            double& getRef(int row, int col) { return arr[row + (col * rows)]; }
+            double getVal(int row, int col) const { return arr[row + (col * rows)]; }
             bool isSquareMatrix() { return rows == cols; }
             void fill(double *fillArray);
             void fillRandom(int min, int max);
