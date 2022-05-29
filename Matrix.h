@@ -29,19 +29,19 @@ namespace SimpiNS
             void calculateMinor(double* currentArray, double* minorArray, int i, int j, int n, int order);
 
             // jacobi() helper functions
-            void jacobiSaveInputs(int start, int end, Matrix &saveEq, Matrix &constants, Matrix &saveConst);
-            void jacobiSwitchAndDivide(int start, int end, Matrix &constants, Matrix &solution, Matrix &prev, int synchOffset);
-            void jacobiFirstIteration(int start, int end, Matrix &solution, Matrix &prev, int synchOffset);
-            void jacobiRemainingIterations(int start, int end, Matrix &solution, Matrix &prev, int synchOffset);
-            void jacobiRestoreInputs(int start, int end, Matrix &saveEq, Matrix &constants, Matrix &saveConst);
+            void jacobiSaveInputs(int start, int end, Matrix &saveEq, Matrix &B, Matrix &saveB);
+            void jacobiSwitchAndDivide(int start, int end, Matrix &B, Matrix &x, Matrix &prev, int synchOffset);
+            void jacobiFirstIteration(int start, int end, Matrix &x, Matrix &prev, int synchOffset);
+            void jacobiRemainingIterations(int start, int end, Matrix &x, Matrix &prev, int synchOffset);
+            void jacobiRestoreInputs(int start, int end, Matrix &saveEq, Matrix &B, Matrix &saveB);
 
             // algebra helper functions
-            void determineEquality(Matrix &comparand, int start, int end, bool moreRows, bool* eqValue);
+            void determineEquality(Matrix &B, int start, int end, bool moreRows, bool* eqValue);
             bool *getSharedBool(int &fd);
             void calculateProduct(Matrix &B, Matrix* C, int start, int end, bool moreRows);
-            void calculateScalarProduct(double lambda, Matrix* product, int start, int end, bool moreRows);
-            void calculateSum(const Matrix &B, Matrix* sum, int start, int end, bool moreRows);
-            void calculateDifference(const Matrix &B, Matrix* sum, int start, int end, bool moreRows);
+            void calculateScalarProduct(double lambda, Matrix* ATimesLambda, int start, int end, bool moreRows);
+            void calculateSum(const Matrix &B, Matrix* C, int start, int end, bool moreRows);
+            void calculateDifference(const Matrix &B, Matrix* C, int start, int end, bool moreRows);
             void calculateTranspose(Matrix* A_T, int start, int end, bool moreRows);
 
         public:
@@ -66,31 +66,31 @@ namespace SimpiNS
             void adjoint(Matrix &adj);
             
             void inverse(Matrix &inv);
-            void luDecomposition(Matrix* lower, Matrix* upper);
+            void luDecomposition(Matrix* L, Matrix* U);
             void backwardSubstitution(float* b, float* x);
             void forwardSubstitution(float *b, float* x); 
 
-            void solveSystem(Matrix &solution, Matrix &constants);
-            void jacobi(Matrix &solution, Matrix &constants); // TODO: fix, synch() getting stuck in jacobiRemainingIterations()
-            void failSafe(Matrix &solution, Matrix &constants);
+            void solveSystem(Matrix &x, Matrix &B);
+            void jacobi(Matrix &x, Matrix &B); // TODO: fix, synch() getting stuck in jacobiRemainingIterations()
+            void failSafe(Matrix &x, Matrix &B);
             bool isDiagonallyDominant();
 
             friend std::ostream& operator<<(std::ostream& out, const Matrix& m);
 
-            bool equals(Matrix &comparand);
+            bool equals(Matrix &B);
                 friend bool operator==(Matrix &lhs, Matrix &rhs);
                 friend bool operator!=(Matrix &lhs, Matrix &rhs);  
-            Matrix &multiply(Matrix &operand);
+            Matrix &multiply(Matrix &B);
                 friend Matrix &operator*(Matrix &lhs, Matrix &rhs);
                 friend void operator*=(Matrix &lhs, Matrix &rhs);
-            Matrix &scalarMultiply(double operand);
+            Matrix &scalarMultiply(double lambda);
                 friend Matrix &operator*(double lhs, Matrix &rhs);
                 friend Matrix &operator*(Matrix &lhs, double rhs);
                 friend void operator*=(Matrix &lhs, double rhs);
-            Matrix &add(Matrix &operand);
+            Matrix &add(Matrix &B);
                 friend Matrix &operator+(Matrix &lhs, Matrix &rhs);
                 friend void operator+=(Matrix &lhs, Matrix &rhs);
-            Matrix &subtract(Matrix &operand);
+            Matrix &subtract(Matrix &B);
                 friend Matrix &operator-(Matrix &lhs, Matrix &rhs);
                 friend void operator-=(Matrix &lhs, Matrix &rhs); 
             Matrix &transpose();

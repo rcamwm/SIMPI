@@ -31,6 +31,12 @@ namespace SimpiNS
     void Matrix::setPrintPrecision(int p) { printPrecision = p; }
     int Matrix::printPrecision = 2;
 
+    /**
+     * Construct a new Matrix object
+     * 
+     * @param rowCount the number of rows of the Matrix (stacked vertically)
+     * @param colCount the number of columns of the Matrix (placed horizontally)
+     */
     Matrix::Matrix(int rowCount, int colCount)
     {
         // use mainSimpi to init the Matrix for all processes. The id is also in simp
@@ -41,6 +47,11 @@ namespace SimpiNS
         cols = colCount;
     }
 
+    /**
+     * Construct a new Matrix object
+     * 
+     * @param m an existing Matrix whose contents will be copied to the new Matrix object
+     */
     Matrix::Matrix(const Matrix &m)
     {
         std::pair<std::string, double*> passBack(mainSimpi->createMatrix(m.rows, m.cols));
@@ -82,11 +93,23 @@ namespace SimpiNS
         mainSimpi->synch();
     }
 
+    /**
+     * Frees and unlinks memory that was allocated with Simpi.
+     */
     Matrix::~Matrix()
     {
-        mainSimpi->freeMatrix(uniqueID); // frees and unlinks memory
+        mainSimpi->freeMatrix(uniqueID);
     }
 
+    /**
+     * Copies all values in the double array from another Matrix
+     * into the double array of this Matrix, in the same order. 
+     * 
+     * @param m the Matrix that values are being copied from
+     * @param start the first row or column index for this process to work on
+     * @param end the last row or column index for this process to work on
+     * @param moreRows determines if the processes will divide rows or cols
+     */
     void Matrix::copyElements(const Matrix &m, int start, int end, bool moreRows)
     {
         int rowStart, rowEnd, colStart, colEnd;
@@ -131,6 +154,12 @@ namespace SimpiNS
         mainSimpi->synch();
     }
 
+    /**
+     * Fills the matrix with random doubles between a certain range. 
+     * 
+     * @param min the minimum possible value for a randomly generated element
+     * @param max the maximum possible value for a randomly generated element
+     */
     void Matrix::fillRandom(int min, int max)
     {
         if (mainSimpi->getID() == 0)
@@ -149,6 +178,12 @@ namespace SimpiNS
         mainSimpi->synch();
     }
 
+    /**
+     * The determinant is a scalar value based on the entries of a square matrix.
+     * Calling Matrix must have equal row and col count. 
+     * 
+     * @return the determinant of the Matrix
+     */
     double Matrix::determinant()
     {
         if (!isSquareMatrix()) 
@@ -193,6 +228,13 @@ namespace SimpiNS
         return det;
     }
 
+    /**
+     * The adjoint of a square matrix is the transpose of its cofactor matrix.
+     * Calling Matrix must have equal row and col count.
+     * 
+     * @param adj a Matrix with the same size as the this Matrix
+     *            that will be overwritten with adjoint matrix
+     */
     void Matrix::adjoint(Matrix &adj)
     {
         if (!isSquareMatrix() || !adj.isSquareMatrix() || getRows() != adj.getRows()) 
@@ -311,12 +353,15 @@ namespace SimpiNS
         }
     }
 
-    /*
-    This function calculates the lower and upper triangular matrices of a square nxn Matrix
-    It requires an input of 2 empty nxn matrices that are modified 
-    A = LU
-    */
-    void Matrix::luDecomposition(Matrix* lower, Matrix* upper) {
+    /**
+     * This function calculates the lower and upper triangular matrices of a square matrix,
+     * such that A = LU.
+     * Calling Matrix must have equal row and col count.
+     * 
+     * @param L pointer to a Matrix of equal size as this Matrix (A) to be overwritten
+     * @param U pointer to a Matrix of equal size as this Matrix (A) to be overwritten
+     */
+    void Matrix::luDecomposition(Matrix* L, Matrix* U) {
 
         if (!isSquareMatrix()) 
         {
@@ -347,10 +392,10 @@ namespace SimpiNS
                 // Summation of L(i, j) * U(j, k) 
                 float sum = 0;
                 for (int j = 0; j < i; j++) 
-                    sum += (lower->getVal(i, j) * upper->getVal(j, k)); 
+                    sum += (L->getVal(i, j) * U->getVal(j, k)); 
 
                 // Evaluating U(i, k) 
-                upper->getRef(i,k) = getVal(i,k) - sum; 
+                U->getRef(i,k) = getVal(i,k) - sum; 
 
             }
 
@@ -368,10 +413,10 @@ namespace SimpiNS
                         // Summation of L(i, j) * U(j, k) 
                         float sum = 0;
                         for (int j = 0; j < i; j++) 
-                            sum += (lower->getVal(i, j) * upper->getVal(j, a));
+                            sum += (L->getVal(i, j) * U->getVal(j, a));
 
                         // Evaluating U(i, k) 
-                        upper->getRef(i, a) = getVal(i, a) - sum;
+                        U->getRef(i, a) = getVal(i, a) - sum;
                     }
                 }
             }
@@ -389,15 +434,15 @@ namespace SimpiNS
                     break;
                 
                 if (i == k)
-                    lower->getRef(i, i) = 1; // Diagonal as 1 
+                    L->getRef(i, i) = 1; // Diagonal as 1 
                 else 
                 {
                     // Summation of L(k, j) * U(j, i)
                     float sum = 0;
                     for (int j = 0; j < i; j++) 
-                    sum += (lower->getVal(k, j) * upper->getVal(j, i));
+                    sum += (L->getVal(k, j) * U->getVal(j, i));
                     // Evaluating L(k, i)
-                    lower->getRef(k, i) = ((getVal(k, i) - sum) / upper->getVal(i, i));
+                    L->getRef(k, i) = ((getVal(k, i) - sum) / U->getVal(i, i));
                 }
             }
 
@@ -413,16 +458,16 @@ namespace SimpiNS
                     for (int a = start; a < end; a++) 
                     {
                         if (i == a)
-                            lower->getRef(i, i) = 1; // Diagonal as 1
+                            L->getRef(i, i) = 1; // Diagonal as 1
                         else 
                         {
                             // Summation of L(k, j) * U(j, i) 
                             float sum = 0;
                             for (int j = 0; j < i; j++) 
-                            sum += (lower->getVal(a, j) * upper->getVal(j, i));
+                            sum += (L->getVal(a, j) * U->getVal(j, i));
 
                             // Evaluating L(k, i) 
-                            lower->getRef(a, i) = (getVal(a, i)-sum) / upper->getVal(i, i);
+                            L->getRef(a, i) = (getVal(a, i)-sum) / U->getVal(i, i);
                         }
                     }
                 }
@@ -432,14 +477,15 @@ namespace SimpiNS
         return;
     }
 
-    /*
-    This method calculates the inverse of a Matrix by using its LU Decomposition
-    A = LU
-    LZ = B
-    LX = Z
-    B corresponds to individual columns of an nxn identity Matrix
-    X represents each corresponding column of the inverse Matrix
-    */
+    /**
+     * This method calculates the inverse of a Matrix by using its LU Decomposition,
+     * such that A = LU, where LZ = B and LX = Z,
+     * and where B corresponds to individual columns of an identity Matrix of the same size
+     * and where X represents each corresponding column of the inverse Matrix.
+     * Calling Matrix must have equal row and col count
+     * 
+     * @param inv Matrix of equal size as the calling Matrix to be overwritten
+     */
     void Matrix::inverse(Matrix &inv) 
     {
         if (!isSquareMatrix() || !inv.isSquareMatrix() || getRows() != inv.getRows()) 
@@ -586,20 +632,22 @@ namespace SimpiNS
         }
     }
 
-    /*
-    Ax=B
-    Solves a linear system of equations
-    If the Matrix is diagonally dominant, jacobi-iterative method is used
-    else, the inverse mutliplication method is used
-    takes in a Vector of constants that each row is to be solved for and a solution Vector of 0s in which the solution will be written in
-    void -> void
-    */
-    void Matrix::solveSystem(Matrix &solution, Matrix &constants)
+    /**
+     * Solves a linear system of equations Ax=B.
+     * If the Matrix is diagonally dominant, the jacobi-iterative method is used,
+     * if not, the inverse mutliplication method is used.
+     * 
+     * Calling Matrix must have equal row and col count.
+     * 
+     * @param x a single column Matrix with equal rows to calling Matrix that the solution will be written into
+     * @param B a single column Matrix of constants with equal rows to calling Matrix that each row is to be solved for
+     */
+    void Matrix::solveSystem(Matrix &x, Matrix &B)
     {
-        if (solution.cols != 1 || solution.rows != rows || constants.cols != 1 || constants.rows != rows)
+        if (x.cols != 1 || x.rows != rows || B.cols != 1 || B.rows != rows)
         {
-            std::cout << "Cannot solve linear system of equations for x(" << solution.rows << ", " << solution.cols << ") ";
-            std::cout << "and B(" << constants.rows << ", " << constants.cols << ")" << std::endl;
+            std::cout << "Cannot solve linear system of equations for x(" << x.rows << ", " << x.cols << ") ";
+            std::cout << "and B(" << B.rows << ", " << B.cols << ")" << std::endl;
             std::cout << "Parameters must be size x(1, " << rows << ") and B(1, " << rows << std::endl;
             exit(1);
         }
@@ -609,33 +657,35 @@ namespace SimpiNS
         if (dd)
         {
             mainSimpi->synch();
-            jacobi(solution, constants);
+            jacobi(x, B);
         }
         else
         {
             mainSimpi->synch();
-            failSafe(solution, constants);
+            failSafe(x, B);
         }
         mainSimpi->synch();
     }
 
-    /*
-        Solves a linear system of equations in parallel if the Matrix is diagonally dominant
-        outputs solution to a Vector of 0s passed into it
-        void->void
+    /**
+     * Solves a linear system of equations Ax=B in parallel if the Matrix is diagonally dominant.
+     * Calling Matrix must have equal row and col count.
+     * 
+     * @param x a single column Matrix that the solution will be written into
+     * @param B a single column Matrix of constants that each row is to be solved for
     */
-    void Matrix::jacobi(Matrix &solution, Matrix &constants) 
+    void Matrix::jacobi(Matrix &x, Matrix &B) 
     {
         int id = mainSimpi->getID();
         int processCount = mainSimpi->getProcessCount();
-        if (processCount > constants.getRows()) 
-            processCount = constants.getRows();
+        if (processCount > B.getRows()) 
+            processCount = B.getRows();
         
-        Matrix saveEq(getRows(), getCols() + 1); // save equations from modification
-        Matrix saveConst(constants.getRows(), 1); // saves input Matrix
-        Matrix prev(constants.getRows(), 1); // shared mem containing a copy of values
+        Matrix saveEq(getRows(), getCols() + 1); // save calling Matrix and B
+        Matrix saveB(B.getRows(), 1); // saves B
+        Matrix prev(B.getRows(), 1); // shared mem containing a copy of values
 
-        int work = constants.getRows() / processCount; 
+        int work = B.getRows() / processCount; 
         int start = 0;
         int end = 0;
         if (id < processCount) // Extra processes get no work => start and end stay at 0
@@ -643,7 +693,7 @@ namespace SimpiNS
             start = id * work;
             end = start + work;
         }
-        int remainingWork = constants.getRows() % processCount;
+        int remainingWork = B.getRows() % processCount;
         if (id == processCount - 1) // Last active process gets all remaining work
             end += remainingWork;
         // synch() is called (end - start) number of times in several jacobi helper functions
@@ -651,74 +701,88 @@ namespace SimpiNS
         int synchOffset = (work + remainingWork) - end + start;
         mainSimpi->synch();
 
-        jacobiSaveInputs(start, end, saveEq, constants, saveConst);
+        jacobiSaveInputs(start, end, saveEq, B, saveB);
         mainSimpi->synch();
         std::cout << "ID " << id << ": saved" << std::endl;
 
-        // Switches diagonals with solution elements,
+        // Switches diagonals with x elements,
         // then divides each matrix row by their original diagonal element 
-        jacobiSwitchAndDivide(start, end, constants, solution, prev, synchOffset);
+        jacobiSwitchAndDivide(start, end, B, x, prev, synchOffset);
         mainSimpi->synch();
         std::cout << "ID " << id << ": switched and divided" << std::endl;
 
         // First iteration with substitution 1
-        jacobiFirstIteration(start, end, solution, prev, synchOffset);
+        jacobiFirstIteration(start, end, x, prev, synchOffset);
         mainSimpi->synch();
         std::cout << "ID " << id << ": iterated first" << std::endl;
 
         // Repeat iterations with calculated results
-        jacobiRemainingIterations(start, end, solution, prev, synchOffset);
+        jacobiRemainingIterations(start, end, x, prev, synchOffset);
         mainSimpi->synch();
         std::cout << "ID " << id << ": iterated remaining" << std::endl;
 
-        jacobiRestoreInputs(start, end, saveEq, constants, saveConst);
+        jacobiRestoreInputs(start, end, saveEq, B, saveB);
         mainSimpi->synch();
         std::cout << "ID " << id << ": restored" << std::endl;
-
 
         return;
     }
 
-    void Matrix::jacobiSaveInputs(int start, int end, Matrix &saveEq, Matrix &constants, Matrix &saveConst)
+    /**
+     * Saves inputs to jacobi() to restore later.
+     * 
+     * @param start the first index for this process to work on
+     * @param end the last index for this process to work on
+     * @param saveEq A Matrix that the calling Matrix Object (A) as well as B is being saved to
+     * @param B a single column Matrix of constants that jacobi() is solving for
+     * @param saveB A single column Matrix that B is being saved to
+     */
+    void Matrix::jacobiSaveInputs(int start, int end, Matrix &saveEq, Matrix &B, Matrix &saveB)
     {
         for (int i = start; i < end; i++) 
         {
             for (int j = 0; j < getCols(); j++) 
                 saveEq.getRef(i,j) = getVal(i, j);
 
-            saveEq.getRef(i,getCols() + 1) = constants.getVal(i, 0);
-            saveConst.getRef(i, 0) = constants.getVal(i, 0);
+            saveEq.getRef(i,getCols() + 1) = B.getVal(i, 0);
+            saveB.getRef(i, 0) = B.getVal(i, 0);
         }
     }
 
-    // /*
-    //     In each row, the diagonal element of the matrix is switched with the corresponding element from the solution vector.
-    //     Every element of that matrix row is then divided by the value that was just placed in the solution vector.
-    //     Each element of that matrix row that was not switched is also multiplied by -1.
-    // */
-    void Matrix::jacobiSwitchAndDivide(int start, int end, Matrix &constants, Matrix &solution, Matrix &prev, int synchOffset)
+    /**
+     * In each row, the diagonal element of the matrix is switched with the corresponding element from x. 
+     * Every element of that matrix row is then divided by the value that was just placed in x.
+     * Each element of that matrix row that was not switched is also multiplied by -1.
+     * 
+     * @param start the first index for this process to work on
+     * @param end the last index for this process to work on
+     * @param B a single column Matrix of constants that each row is to be solved for
+     * @param x a single column Matrix that the solution will be written into
+     * @param prev shared memory to be written to for later
+     * @param synchOffset number of times for this process to call synch if it's not doing the maximum amount of work
+     */
+    void Matrix::jacobiSwitchAndDivide(int start, int end, Matrix &B, Matrix &x, Matrix &prev, int synchOffset)
     {
         for (int i = start; i < end; i++) 
         {
             double temp = getVal(i, i);
-            getRef(i, i) = constants.getVal(i, 0);
-            constants.getRef(i, 0) = temp;
+            getRef(i, i) = B.getVal(i, 0);
+            B.getRef(i, 0) = temp;
             for (int j = 0; j < getCols(); j++) 
             {
                 if (j != i)
                     getRef(i, j) *= -1;
         
-                getRef(i, j) /= constants.getVal(i, 0);
-                //mainSimpi->synch();
+                getRef(i, j) /= B.getVal(i, 0);
             }
             prev.getRef(i, 0) = 1.0;
-            solution.getRef(i, 0) = constants.getVal(i, 0);
+            x.getRef(i, 0) = B.getVal(i, 0);
             mainSimpi->synch();
         }
         mainSimpi->synchExtraCycles(synchOffset);
     }
 
-    void Matrix::jacobiFirstIteration(int start, int end, Matrix &solution, Matrix &prev, int synchOffset)
+    void Matrix::jacobiFirstIteration(int start, int end, Matrix &x, Matrix &prev, int synchOffset)
     {
         for (int i = start; i < end; i++) 
         {
@@ -730,22 +794,21 @@ namespace SimpiNS
                 else
                     rowSum += (getVal(i, j) * prev.getVal(j, 0));
                 
-                //mainSimpi->synch();
             }
-            solution.getRef(i, 0) = rowSum;
+            x.getRef(i, 0) = rowSum;
             mainSimpi->synch();
         }
         mainSimpi->synchExtraCycles(synchOffset);
     }
 
-    void Matrix::jacobiRemainingIterations(int start, int end, Matrix &solution, Matrix &prev, int synchOffset)
+    void Matrix::jacobiRemainingIterations(int start, int end, Matrix &x, Matrix &prev, int synchOffset)
     {
         for (int k = 0; k < 1000; k++)
         {
             for (int i = start; i < end; i++)
             {
                 //save prev value for comparision
-                prev.getRef(i, 0) = solution.getVal(i, 0);
+                prev.getRef(i, 0) = x.getVal(i, 0);
                 mainSimpi->synch();
             }
             mainSimpi->synchExtraCycles(synchOffset);
@@ -760,7 +823,7 @@ namespace SimpiNS
                         rowSum += (getVal(i, j) * prev.getVal(j, 0));
                     }
                 }
-                solution.getRef(i, 0) = rowSum;
+                x.getRef(i, 0) = rowSum;
                 //mainSimpi->synch();
             }
             //wait at end of each loop for all processes before beginning next iteration
@@ -768,23 +831,35 @@ namespace SimpiNS
         }
     }
 
-    void Matrix::jacobiRestoreInputs(int start, int end, Matrix &saveEq, Matrix &constants, Matrix &saveConst)
+    /**
+     * Restores saved initial inputs to.
+     * 
+     * @param start the first index for this process to work on
+     * @param end the last index for this process to work on
+     * @param saveEq A Matrix that the calling Matrix Object (A) as well as B was saved to
+     * @param B a single column Matrix of constants that jacobi() solved for
+     * @param saveB A single column Matrix that B was saved to
+     */
+    void Matrix::jacobiRestoreInputs(int start, int end, Matrix &saveEq, Matrix &B, Matrix &saveB)
     {
         for (int i = start; i < end; i++) 
         {
             for (int j = 0; j < getCols(); j++) 
                 getRef(i, j) = saveEq.getVal(i,j);
             
-            constants.getRef(i, 0) = saveConst.getVal(i, 0);
+            B.getRef(i, 0) = saveB.getVal(i, 0);
         }
     }
 
-    /*
-    Method to solve a system of linear equations if the system is not diagonally dominant
-    Uses the inverse-mutliplication method. 
-    void->void
+    /**
+     * Solves a linear system of equations Ax=B in parallel if the Matrix is not diagonally dominant.
+     * Uses the inverse-mutliplication method. 
+     * Calling Matrix must have equal row and col count.
+     * 
+     * @param x a single column Matrix that the solution will be written into
+     * @param B a single column Matrix of constants that each row is to be solved for
     */
-    void Matrix::failSafe(Matrix &solution, Matrix &constants)
+    void Matrix::failSafe(Matrix &x, Matrix &B)
     {
         Matrix* inv = new Matrix(getRows(), getCols());
         inverse(*inv);
@@ -793,7 +868,7 @@ namespace SimpiNS
         int processCount = mainSimpi->getProcessCount();
         int id = mainSimpi->getID();
         
-        int vectorSize = constants.getRows();
+        int vectorSize = B.getRows();
         int work = vectorSize / processCount; 
         int start = 0;
         int end = 0;
@@ -802,7 +877,7 @@ namespace SimpiNS
             start = id * work;
             end = start + work;
         }
-        int remainingWork = constants.getRows() % processCount;
+        int remainingWork = B.getRows() % processCount;
         if (id == processCount - 1) // Last active process gets all remaining work
             end += remainingWork;
         
@@ -812,19 +887,20 @@ namespace SimpiNS
             sol = 0;
             for(int j = 0; j < vectorSize; j++)
             {
-                sol += (inv->getVal(i, j) * constants.getVal(j, 0));
+                sol += (inv->getVal(i, j) * B.getVal(j, 0));
             }
-            solution.getRef(i, 0) = sol;
+            x.getRef(i, 0) = sol;
         }
         mainSimpi->synch();
         return;
     }
 
-    /*
-    Checks if a square Matrix is diagonally dominant
-    (diagonal terms are greater-than or equal to sum of the rest of their row)
-    none->bool
-    */
+    /**
+     * Checks if a Matrix is diagonally dominant.
+     * A squre matrix is diagonally dominant if the diagonal terms 
+     * are greater-than or equal to sum of the rest of their row.
+     * Calling Matrix must have equal row and col count.
+     */
     bool Matrix::isDiagonallyDominant()
     {
         if (!isSquareMatrix())
@@ -849,9 +925,21 @@ namespace SimpiNS
             A[i] = 0;
     }
 
-    bool Matrix::equals(Matrix &comparand)
+    /**
+     * A == B
+     * Checks if another Matrix has equal values to this Matrix.
+     * Returns false if dimensions are different,
+     * of if any of their values at corresponding (row, col) are unequal.
+     * 
+     * Due to Matrix values being doubles, 
+     * it's possible that stray bits will cause undesired results.
+     * This can be adjusted by setting Matrix::setEqualityPrecision() to a higher value.
+     * 
+     * @param B another Matrix to compare
+     */
+    bool Matrix::equals(Matrix &B)
     {
-        if (rows != comparand.rows || cols != comparand.cols)
+        if (rows != B.rows || cols != B.cols)
             return false;
             
         int fd;
@@ -871,14 +959,14 @@ namespace SimpiNS
             int start = processID;
             int end = start + 1;
             if (processID < div)
-                determineEquality(comparand, start, end, moreRows, equalityBool);
+                determineEquality(B, start, end, moreRows, equalityBool);
         }
         else 
         {
             int work = div / processCount;
             int start = processID * work;
             int end = start + work;
-            determineEquality(comparand, start, end, moreRows, equalityBool);
+            determineEquality(B, start, end, moreRows, equalityBool);
 
             int leftoverWork = div % processCount;
             if (leftoverWork != 0)
@@ -886,7 +974,7 @@ namespace SimpiNS
                 start = (work * processCount) + processID;
                 end = start + 1;
                 if (processID < leftoverWork)
-                    determineEquality(comparand, start, end, moreRows, equalityBool);
+                    determineEquality(B, start, end, moreRows, equalityBool);
             }         
         }
         mainSimpi->synch();
@@ -911,6 +999,14 @@ namespace SimpiNS
         return !lhs.equals(rhs);
     }
 
+    /**
+     * Returns a pointer to a bool value shared between all active processes.
+     * Two Matrix objects are not equal if they have different elements.
+     * While processes work in parallel, 
+     * they need a way to communicate if they've found an unequal set of elements.
+     * 
+     * @param fd file descriptor for shared boolean pointer
+     */
     bool* Matrix::getSharedBool(int &fd)
     {
         bool *eq;
@@ -930,7 +1026,18 @@ namespace SimpiNS
         return eq;
     }
 
-    void Matrix::determineEquality(Matrix &comparand, int start, int end, bool moreRows, bool* eqValue)
+    /**
+     * Compares all corresponding Matrix elements that have the same (row, col).
+     * If an unequal set of elements is found the function will return false
+     * and force all other active processes to return false as well.
+     * 
+     * @param B the other Matrix being compared.
+     * @param start the first row or column index for this process to work on
+     * @param end the last row or column index for this process to work on
+     * @param moreRows determines if the processes will divide rows or cols
+     * @param eqValue shared boolean value between all active processes
+     */
+    void Matrix::determineEquality(Matrix &B, int start, int end, bool moreRows, bool* eqValue)
     {
         int rowStart, rowEnd, colStart, colEnd;
         if (moreRows) { rowStart = start, rowEnd = end, colStart = 0, colEnd = cols; }
@@ -940,7 +1047,7 @@ namespace SimpiNS
         {
             for (int col = colStart; col < colEnd; col++)
             {
-                if (fabs(this->getVal(row, col) - comparand.getVal(row, col)) > equalityPrecision)
+                if (fabs(this->getVal(row, col) - B.getVal(row, col)) > equalityPrecision)
                     *eqValue = false;                    
                 if (!*eqValue)
                     return;                
@@ -952,7 +1059,7 @@ namespace SimpiNS
      * C = AB
      * Solves matrix multiplication in parallel and outputs the product solution.
      * 
-     * @param B matrix that this Matrix (A) is being being multiplied with.
+     * @param B matrix that this Matrix (A) is being multiplied with.
      *          B's row count must match this Matrix (A)'s column count.
      * @return the matrix C, the product of this Matrix (A) and B.
      */
@@ -1009,6 +1116,15 @@ namespace SimpiNS
         lhs = lhs.multiply(rhs);
     }
 
+    /**
+     * Calculates C = A * B 
+     * 
+     * @param B the Matrix being multiplied with this Matrix (A)
+     * @param C the resulting Matrix that the solution is being written into
+     * @param start the first row or column index for this process to work on
+     * @param end the last row or column index for this process to work on
+     * @param moreRows determines if the processes will divide rows or cols
+     */
     void Matrix::calculateProduct(Matrix &B, Matrix* C, int start, int end, bool moreRows)
     {
         Matrix *A = this; // For clarity
@@ -1031,9 +1147,16 @@ namespace SimpiNS
         }
     }
 
-    Matrix &Matrix::scalarMultiply(double operand)
+    /**
+     * ATimesLambda = A * lambda
+     * Solves scalar multiplication in parallel and outputs the product solution.
+     * 
+     * @param lambda scalar value that this Matrix (A) is being multiplied with.
+     * @return the Matrix ATimesLambda, the product of this Matrix (A) and lambda.
+     */
+    Matrix &Matrix::scalarMultiply(double lambda)
     {
-        Matrix *product = new Matrix(rows, cols);
+        Matrix *ATimesLambda = new Matrix(rows, cols);
 
         // Processes divide the rows if there are more rows, and divide the columns if not
         bool moreRows = rows > cols;
@@ -1047,14 +1170,14 @@ namespace SimpiNS
             int start = processID;
             int end = start + 1;
             if (processID < div)
-                calculateScalarProduct(operand, product, start, end, moreRows);
+                calculateScalarProduct(lambda, ATimesLambda, start, end, moreRows);
         }
         else 
         {
             int work = div / processCount;
             int start = processID * work;
             int end = start + work;
-            calculateScalarProduct(operand, product, start, end, moreRows);
+            calculateScalarProduct(lambda, ATimesLambda, start, end, moreRows);
 
             int leftoverWork = div % processCount;
             if (leftoverWork != 0)
@@ -1062,11 +1185,11 @@ namespace SimpiNS
                 start = (work * processCount) + processID;
                 end = start + 1;
                 if (processID < leftoverWork)
-                    calculateScalarProduct(operand, product, start, end, moreRows);
+                    calculateScalarProduct(lambda, ATimesLambda, start, end, moreRows);
             }         
         }
         mainSimpi->synch();
-        return *product;
+        return *ATimesLambda;
     }
 
     Matrix &operator*(double lhs, Matrix &rhs)
@@ -1084,7 +1207,16 @@ namespace SimpiNS
         lhs = lhs.scalarMultiply(rhs);
     }
 
-    void Matrix::calculateScalarProduct(double lambda, Matrix* product, int start, int end, bool moreRows)
+    /**
+     * Calculates ATimesLambda = A * lambda
+     * 
+     * @param lambda scalar value that this Matrix (A) is being multiplied with.
+     * @param ATimesLambda the resulting Matrix that the solution is being written into
+     * @param start the first row or column index for this process to work on
+     * @param end the last row or column index for this process to work on
+     * @param moreRows determines if the processes will divide rows or cols
+     */
+    void Matrix::calculateScalarProduct(double lambda, Matrix* ATimesLambda, int start, int end, bool moreRows)
     {
         // Processes divide the rows if there are more rows, and divide the columns if not
         int rowStart, rowEnd, colStart, colEnd;
@@ -1095,14 +1227,21 @@ namespace SimpiNS
         {
             for (int col = colStart; col < colEnd; col++)
             {
-                product->getRef(row, col) = getVal(row, col) * lambda;
+                ATimesLambda->getRef(row, col) = getVal(row, col) * lambda;
             }
         }
     }
 
-    Matrix &Matrix::add(Matrix &operand)
+    /**
+     * C = A + B
+     * Solves matrix addition in parallel and outputs the product solution.
+     * 
+     * @param B a Matrix of equal size to this Matrix (A) 
+     * @return the Matrix C, the sum of this Matrix (A) and B 
+     */
+    Matrix &Matrix::add(Matrix &B)
     {
-        Matrix *sum = new Matrix(rows, cols);
+        Matrix *C = new Matrix(rows, cols);
 
         // Processes divide the rows if there are more rows, and divide the columns if not
         bool moreRows = rows > cols;
@@ -1116,14 +1255,14 @@ namespace SimpiNS
             int start = processID;
             int end = start + 1;
             if (processID < div)
-                calculateSum(operand, sum, start, end, moreRows);
+                calculateSum(B, C, start, end, moreRows);
         }
         else 
         {
             int work = div / processCount;
             int start = processID * work;
             int end = start + work;
-            calculateSum(operand, sum, start, end, moreRows);
+            calculateSum(B, C, start, end, moreRows);
 
             int leftoverWork = div % processCount;
             if (leftoverWork != 0)
@@ -1131,11 +1270,11 @@ namespace SimpiNS
                 start = (work * processCount) + processID;
                 end = start + 1;
                 if (processID < leftoverWork)
-                    calculateSum(operand, sum, start, end, moreRows);
+                    calculateSum(B, C, start, end, moreRows);
             }         
         }
         mainSimpi->synch();
-        return *sum;
+        return *C;
     }
 
     Matrix &operator+(Matrix &lhs, Matrix &rhs)
@@ -1148,7 +1287,16 @@ namespace SimpiNS
         lhs = lhs.add(rhs);
     }
 
-    void Matrix::calculateSum(const Matrix &B, Matrix* sum, int start, int end, bool moreRows)
+    /**
+     * Calculates C = A + B 
+     * 
+     * @param B the Matrix being added to this Matrix (A)
+     * @param C the resulting Matrix that the solution is being written into
+     * @param start the first row or column index for this process to work on
+     * @param end the last row or column index for this process to work on
+     * @param moreRows determines if the processes will divide rows or cols
+     */
+    void Matrix::calculateSum(const Matrix &B, Matrix* C, int start, int end, bool moreRows)
     {
         // Processes divide the rows if there are more rows, and divide the columns if not
         int rowStart, rowEnd, colStart, colEnd;
@@ -1159,14 +1307,21 @@ namespace SimpiNS
         {
             for (int col = colStart; col < colEnd; col++)
             {
-                sum->getRef(row, col) = getVal(row, col) + B.getVal(row, col);
+                C->getRef(row, col) = getVal(row, col) + B.getVal(row, col);
             }
         }
     }
 
-    Matrix &Matrix::subtract(Matrix &operand)
+    /**
+     * C = A - B
+     * Solves matrix addition in parallel and outputs the product solution.
+     * 
+     * @param B a Matrix of equal size to this Matrix (A) 
+     * @return the Matrix C, the difference between this Matrix (A) and B 
+     */
+    Matrix &Matrix::subtract(Matrix &B)
     {
-        Matrix *difference = new Matrix(rows, cols);
+        Matrix *C = new Matrix(rows, cols);
 
         // Processes divide the rows if there are more rows, and divide the columns if not
         bool moreRows = rows > cols;
@@ -1180,14 +1335,14 @@ namespace SimpiNS
             int start = processID;
             int end = start + 1;
             if (processID < div)
-                calculateDifference(operand, difference, start, end, moreRows);
+                calculateDifference(B, C, start, end, moreRows);
         }
         else 
         {
             int work = div / processCount;
             int start = processID * work;
             int end = start + work;
-            calculateDifference(operand, difference, start, end, moreRows);
+            calculateDifference(B, C, start, end, moreRows);
 
             int leftoverWork = div % processCount;
             if (leftoverWork != 0)
@@ -1195,11 +1350,11 @@ namespace SimpiNS
                 start = (work * processCount) + processID;
                 end = start + 1;
                 if (processID < leftoverWork)
-                    calculateDifference(operand, difference, start, end, moreRows);
+                    calculateDifference(B, C, start, end, moreRows);
             }         
         }
         mainSimpi->synch();
-        return *difference;
+        return *C;
     }
 
     Matrix &operator-(Matrix &lhs, Matrix &rhs)
@@ -1212,7 +1367,16 @@ namespace SimpiNS
         lhs = lhs.subtract(rhs);
     }
 
-    void Matrix::calculateDifference(const Matrix &B, Matrix* difference, int start, int end, bool moreRows)
+    /**
+     * Calculates C = A - B 
+     * 
+     * @param B the Matrix being subtracted from this Matrix (A)
+     * @param C the resulting Matrix that the solution is being written into
+     * @param start the first row or column index for this process to work on
+     * @param end the last row or column index for this process to work on
+     * @param moreRows determines if the processes will divide rows or cols
+     */
+    void Matrix::calculateDifference(const Matrix &B, Matrix* C, int start, int end, bool moreRows)
     {
         // Processes divide the rows if there are more rows, and divide the columns if not
         int rowStart, rowEnd, colStart, colEnd;
@@ -1223,11 +1387,18 @@ namespace SimpiNS
         {
             for (int col = colStart; col < colEnd; col++)
             {
-                difference->getRef(row, col) = getVal(row, col) - B.getVal(row, col);
+                C->getRef(row, col) = getVal(row, col) - B.getVal(row, col);
             }
         }
     }
 
+    /**
+     * A^T 
+     * Returns the transpose of this Matrix (A).
+     * The tranpose of a matrix is one in which its row and col indices are switched,
+     * such that (row, col) -> (col, row).
+     * Its dimensions are also switched from (row size, col size) to (col size, row size). 
+     */
     Matrix &Matrix::transpose()
     {
         Matrix *A_T = new Matrix(cols, rows);
@@ -1266,6 +1437,14 @@ namespace SimpiNS
         return *A_T;
     }
 
+    /**
+     * Calculates A^T
+     * 
+     * @param A_T the resulting Matrix that the solution is being written into
+     * @param start the first row or column index for this process to work on
+     * @param end the last row or column index for this process to work on
+     * @param moreRows determines if the processes will divide rows or cols
+     */
     void Matrix::calculateTranspose(Matrix* A_T, int start, int end, bool moreRows)
     {
         // Processes divide the rows if there are more rows, and divide the columns if not
