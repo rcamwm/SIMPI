@@ -84,6 +84,38 @@ void test_matrix_scalar_multiplication()
     record(passMessage, true);
 }
 
+void test_matrix_addition()
+{
+    std::string passMessage = "test_matrix_addition()";
+
+    Matrix A(ROWS, COLS);
+    A.fillRandom(-50, 50);
+
+    Matrix B(ROWS, COLS);
+    A.fillRandom(-50, 50);
+    
+    
+    mainClock = std::clock();
+    A + B;
+    record(passMessage, true);
+}
+
+void test_matrix_subtraction()
+{
+    std::string passMessage = "test_matrix_subtraction()";
+
+    Matrix A(ROWS, COLS);
+    A.fillRandom(-50, 50);
+
+    Matrix B(ROWS, COLS);
+    A.fillRandom(-50, 50);
+    
+    
+    mainClock = std::clock();
+    A - B;
+    record(passMessage, true);
+}
+
 void test_inverse()
 {
     std::string passMessage = "test_inverse()";
@@ -182,6 +214,8 @@ void runTests()
     test_copy_constructor();
     test_matrix_multiplication();
     test_matrix_scalar_multiplication();
+    test_matrix_addition();
+    test_matrix_subtraction();
     test_inverse();
     // test_determinant(); // DO NOT RUN UNTIL ALGORITHM TAKES ADVANTAGE OF MULTUPLE PROCESSES
     test_adjoint();

@@ -213,6 +213,70 @@ void test_matrix_scalar_multiplication()
     assertAndPrint(passMessage + std::to_string(testNo++), A2Point5 == A);
 }
 
+void test_matrix_addition()
+{
+    std::string passMessage = "test_matrix_addition() passes test ";
+    int testNo = 1;
+    double x[] = { 1, 2, 3,
+                   4, 5, 6,
+                   7, 8, 9};
+    Matrix A(3, 3);
+    A.fill(x);
+
+    double y[] = { -5.1,  3.2,  6.9,
+                    2.4, -5.0, -5.6,
+                    7.3, -2.8,  1.9};
+    Matrix B(3, 3);
+    B.fill(y);
+
+    double z[] = {  -4.1, 5.2,  9.9,
+                     6.4, 0.0,  0.4,
+                    14.3, 5.2, 10.9};
+    Matrix C(3, 3);
+    C.fill(z);
+    
+    Matrix::setEqualityPrecision(0.00000001f);
+    assertAndPrint(passMessage + std::to_string(testNo++), A + B == C);
+
+    A.fill(x);
+    A += B;
+    assertAndPrint(passMessage + std::to_string(testNo++), A == C);
+
+    Matrix::setEqualityPrecision(0.00f);
+}
+
+void test_matrix_subtraction()
+{
+    std::string passMessage = "test_matrix_subtraction() passes test ";
+    int testNo = 1;
+
+    double x[] = { -5.1,  3.2,  6.9,
+                    2.4, -5.0, -5.6,
+                    7.3, -2.8,  1.9};
+    Matrix A(3, 3);
+    A.fill(x);
+
+    double y[] = {  4.2,  1.2, -9.3,
+                    9.2, -2.7,  6.5,
+                   10.3,  1.8,  2.1};
+    Matrix B(3, 3);
+    B.fill(y);
+
+    double z[] = { -9.3,  2.0,  16.2,
+                   -6.8, -2.3, -12.1,
+                   -3.0, -4.6,  -0.2};
+    Matrix C(3, 3);
+    C.fill(z);
+    Matrix::setEqualityPrecision(0.00000001f);
+    assertAndPrint(passMessage + std::to_string(testNo++), A - B == C);
+
+    A.fill(x);
+    A -= B;
+    assertAndPrint(passMessage + std::to_string(testNo++), A == C);
+
+    Matrix::setEqualityPrecision(0.00f);
+}
+
 
 void test_inverse()
 {
@@ -379,6 +443,8 @@ void runTests()
     test_matrix_multiplication_more_rows();
     test_matrix_multiplication_more_cols();
     test_matrix_scalar_multiplication();
+    test_matrix_addition();
+    test_matrix_subtraction();
     test_inverse();
     test_determinant();
     test_adjoint();

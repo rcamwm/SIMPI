@@ -1100,6 +1100,135 @@ namespace SimpiNS
         }
     }
 
+    Matrix &Matrix::add(Matrix &operand)
+    {
+        Matrix *sum = new Matrix(rows, cols);
+
+        // Processes divide the rows if there are more rows, and divide the columns if not
+        bool moreRows = rows > cols;
+        int div = (moreRows) ? rows : cols; // Number of lines to divide between processes
+
+        int processCount = mainSimpi->getProcessCount();
+        int processID = mainSimpi->getID();
+
+        if (div <= processCount)
+        {
+            int start = processID;
+            int end = start + 1;
+            if (processID < div)
+                calculateSum(operand, sum, start, end, moreRows);
+        }
+        else 
+        {
+            int work = div / processCount;
+            int start = processID * work;
+            int end = start + work;
+            calculateSum(operand, sum, start, end, moreRows);
+
+            int leftoverWork = div % processCount;
+            if (leftoverWork != 0)
+            {
+                start = (work * processCount) + processID;
+                end = start + 1;
+                if (processID < leftoverWork)
+                    calculateSum(operand, sum, start, end, moreRows);
+            }         
+        }
+        mainSimpi->synch();
+        return *sum;
+    }
+
+    Matrix &operator+(Matrix &lhs, Matrix &rhs)
+    {
+        return rhs.add(lhs);
+    }
+
+    void operator+=(Matrix &lhs, Matrix &rhs)
+    {
+        lhs = lhs.add(rhs);
+    }
+
+    void Matrix::calculateSum(const Matrix &B, Matrix* sum, int start, int end, bool moreRows)
+    {
+        // Processes divide the rows if there are more rows, and divide the columns if not
+        int rowStart, rowEnd, colStart, colEnd;
+        if (moreRows) { rowStart = start, rowEnd = end, colStart = 0, colEnd = cols; }
+        else { rowStart = 0, rowEnd = rows, colStart = start, colEnd = end; }
+
+        for (int row = rowStart; row < rowEnd; row++)
+        {
+            for (int col = colStart; col < colEnd; col++)
+            {
+                sum->getRef(row, col) = getVal(row, col) + B.getVal(row, col);
+            }
+        }
+    }
+
+    Matrix &Matrix::subtract(Matrix &operand)
+    {
+        Matrix *difference = new Matrix(rows, cols);
+
+        // Processes divide the rows if there are more rows, and divide the columns if not
+        bool moreRows = rows > cols;
+        int div = (moreRows) ? rows : cols; // Number of lines to divide between processes
+
+        int processCount = mainSimpi->getProcessCount();
+        int processID = mainSimpi->getID();
+
+        if (div <= processCount)
+        {
+            int start = processID;
+            int end = start + 1;
+            if (processID < div)
+                calculateDifference(operand, difference, start, end, moreRows);
+        }
+        else 
+        {
+            int work = div / processCount;
+            int start = processID * work;
+            int end = start + work;
+            calculateDifference(operand, difference, start, end, moreRows);
+
+            int leftoverWork = div % processCount;
+            if (leftoverWork != 0)
+            {
+                start = (work * processCount) + processID;
+                end = start + 1;
+                if (processID < leftoverWork)
+                    calculateDifference(operand, difference, start, end, moreRows);
+            }         
+        }
+        mainSimpi->synch();
+        return *difference;
+    }
+
+    Matrix &operator-(Matrix &lhs, Matrix &rhs)
+    {
+        return lhs.subtract(rhs);
+    }
+
+    void operator-=(Matrix &lhs, Matrix &rhs)
+    {
+        lhs = lhs.subtract(rhs);
+    }
+
+    void Matrix::calculateDifference(const Matrix &B, Matrix* difference, int start, int end, bool moreRows)
+    {
+        // Processes divide the rows if there are more rows, and divide the columns if not
+        int rowStart, rowEnd, colStart, colEnd;
+        if (moreRows) { rowStart = start, rowEnd = end, colStart = 0, colEnd = cols; }
+        else { rowStart = 0, rowEnd = rows, colStart = start, colEnd = end; }
+
+        for (int row = rowStart; row < rowEnd; row++)
+        {
+            for (int col = colStart; col < colEnd; col++)
+            {
+                difference->getRef(row, col) = getVal(row, col) - B.getVal(row, col);
+            }
+        }
+    }
+
+
     std::ostream& operator<<(std::ostream& out, const Matrix& m)
     {
         if (m.getSimpiID() == 0)
