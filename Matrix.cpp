@@ -49,7 +49,7 @@ namespace SimpiNS
         rows = m.rows;
         cols = m.cols;
 
-        // Processes divide the rows if C has more rows, and divide the columns if not
+        // Processes divide the rows if there are more rows, and divide the columns if not
         bool moreRows = rows > cols;
         int div = (moreRows) ? rows : cols; // Number of lines to divide between processes
 
@@ -1031,6 +1031,75 @@ namespace SimpiNS
         }
     }
 
+    Matrix &Matrix::scalarMultiply(double operand)
+    {
+        Matrix *product = new Matrix(rows, cols);
+
+        // Processes divide the rows if there are more rows, and divide the columns if not
+        bool moreRows = rows > cols;
+        int div = (moreRows) ? rows : cols; // Number of lines to divide between processes
+
+        int processCount = mainSimpi->getProcessCount();
+        int processID = mainSimpi->getID();
+
+        if (div <= processCount)
+        {
+            int start = processID;
+            int end = start + 1;
+            if (processID < div)
+                calculateScalarProduct(operand, product, start, end, moreRows);
+        }
+        else 
+        {
+            int work = div / processCount;
+            int start = processID * work;
+            int end = start + work;
+            calculateScalarProduct(operand, product, start, end, moreRows);
+
+            int leftoverWork = div % processCount;
+            if (leftoverWork != 0)
+            {
+                start = (work * processCount) + processID;
+                end = start + 1;
+                if (processID < leftoverWork)
+                    calculateScalarProduct(operand, product, start, end, moreRows);
+            }         
+        }
+        mainSimpi->synch();
+        return *product;
+    }
+
+    Matrix &operator*(double lhs, Matrix &rhs)
+    {
+        return rhs.scalarMultiply(lhs);
+    }
+
+    Matrix &operator*(Matrix &lhs, double rhs)
+    {
+        return lhs.scalarMultiply(rhs);
+    }
+
+    void operator*=(Matrix &lhs, double rhs)
+    {
+        lhs = lhs.scalarMultiply(rhs);
+    }
+
+    void Matrix::calculateScalarProduct(double lambda, Matrix* product, int start, int end, bool moreRows)
+    {
+        // Processes divide the rows if there are more rows, and divide the columns if not
+        int rowStart, rowEnd, colStart, colEnd;
+        if (moreRows) { rowStart = start, rowEnd = end, colStart = 0, colEnd = cols; }
+        else { rowStart = 0, rowEnd = rows, colStart = start, colEnd = end; }
+
+        for (int row = rowStart; row < rowEnd; row++)
+        {
+            for (int col = colStart; col < colEnd; col++)
+            {
+                product->getRef(row, col) = getVal(row, col) * lambda;
+            }
+        }
+    }
+
     std::ostream& operator<<(std::ostream& out, const Matrix& m)
     {
         if (m.getSimpiID() == 0)
@@ -1048,8 +1117,5 @@ namespace SimpiNS
         }
         return out;
     }
-
-
-
 
 }

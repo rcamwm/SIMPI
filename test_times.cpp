@@ -1,5 +1,9 @@
 /*
-     
+    This file contains tests to check the speed of Matrix functions with different process counts.
+    Each function loads Matrix objects with random values using Matrix::fillRandom().
+    Except for the column vectors in the failsafe and jacobi functions
+    all Matrix objects have the same dimensions: global variables ROWS and COLS.
+    Keep in mind that many functions will not run if ROWS and COLS are not equal.
 */
 
 #include <assert.h>
@@ -24,7 +28,7 @@ void record(std::string message, bool includeTime)
     if (mainSimpi->getID() == 0)
     {
         if (includeTime)
-            std::cout << total << " seconds: ";
+            std::cout << std::fixed << std::setprecision(4) << total << " seconds: ";
         std::cout << message << std::endl;;
     }
 }
@@ -64,6 +68,19 @@ void test_matrix_multiplication()
     
     mainClock = std::clock();
     A * B;
+    record(passMessage, true);
+}
+
+void test_matrix_scalar_multiplication()
+{
+    std::string passMessage = "test_matrix_scalar_multiplication()";
+
+    Matrix A(ROWS, COLS);
+    A.fillRandom(-50, 50);
+    double lambda = A.getVal(0,0) * 1.23;
+    
+    mainClock = std::clock();
+    A * lambda;
     record(passMessage, true);
 }
 
@@ -164,6 +181,7 @@ void runTests()
     test_equality();
     test_copy_constructor();
     test_matrix_multiplication();
+    test_matrix_scalar_multiplication();
     test_inverse();
     // test_determinant(); // DO NOT RUN UNTIL ALGORITHM TAKES ADVANTAGE OF MULTUPLE PROCESSES
     test_adjoint();

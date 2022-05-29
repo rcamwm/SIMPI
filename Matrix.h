@@ -39,6 +39,7 @@ namespace SimpiNS
             void determineEquality(Matrix &comparand, int start, int end, bool moreRows, bool* eqValue);
             bool *getSharedBool(int &fd);
             void calculateProduct(Matrix &B, Matrix* C, int start, int end, bool moreRows);
+            void calculateScalarProduct(double lambda, Matrix* product, int start, int end, bool moreRows);
 
         public:
             static void setSimpi(Simpi *s);
@@ -81,10 +82,10 @@ namespace SimpiNS
             friend Matrix &operator*(Matrix &lhs, Matrix &rhs);
             friend void operator*=(Matrix &lhs, Matrix &rhs);
             
-            Matrix &scalarMultiply(int operand); // TODO
-            friend Matrix &operator*(int lhs, Matrix &rhs);
-            friend Matrix &operator*(Matrix &lhs, int rhs);
-            friend void operator*=(Matrix &lhs, int rhs);
+            Matrix &scalarMultiply(double operand); // TODO
+            friend Matrix &operator*(double lhs, Matrix &rhs);
+            friend Matrix &operator*(Matrix &lhs, double rhs);
+            friend void operator*=(Matrix &lhs, double rhs);
 
             Matrix &add(Matrix &operand); // TODO
             friend Matrix &operator+(Matrix &lhs, Matrix &rhs);

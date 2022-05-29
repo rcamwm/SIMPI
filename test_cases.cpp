@@ -4,7 +4,7 @@
     number generator. These random inputs were then calculated outside of this program and those specific 
     results are compared to the output of each Matrix function.
 
-    Testing efficiency and speed should be done in another file using much larger Matrix sizes and random input. 
+    These test cases should be run whenever major changes or updates are made to either Matrix.h/cpp or Simpi.h/cpp.
 */
 
 #include <assert.h>
@@ -187,6 +187,33 @@ void test_matrix_multiplication_more_cols()
 
 }
 
+void test_matrix_scalar_multiplication()
+{
+    std::string passMessage = "test_matrix_scalar_multiplication() passes test ";
+    int testNo = 1;
+    double x[] = { 1, 2, 3,
+                   4, 5, 6,
+                   7, 8, 9};
+    Matrix A(3, 3);
+    A.fill(x);
+    
+    double xTimes2Point5[] = { 2.5,  5.0,  7.5,
+                              10.0, 12.5, 15.0,
+                              17.5, 20.0, 22.5};
+    Matrix A2Point5(3, 3);
+    A2Point5.fill(xTimes2Point5);
+
+    assertAndPrint(passMessage + std::to_string(testNo++), A2Point5 == A * 2.5);
+
+    A.fill(x);
+    assertAndPrint(passMessage + std::to_string(testNo++), A2Point5 == 2.5 * A);
+
+    A.fill(x);
+    A *= 2.5;
+    assertAndPrint(passMessage + std::to_string(testNo++), A2Point5 == A);
+}
+
+
 void test_inverse()
 {
     std::string passMessage = "test_inverse() passes test ";
@@ -351,6 +378,7 @@ void runTests()
     test_matrix_multiplication_same_size();
     test_matrix_multiplication_more_rows();
     test_matrix_multiplication_more_cols();
+    test_matrix_scalar_multiplication();
     test_inverse();
     test_determinant();
     test_adjoint();
