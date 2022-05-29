@@ -116,6 +116,18 @@ void test_matrix_subtraction()
     record(passMessage, true);
 }
 
+void test_transpose()
+{
+    std::string passMessage = "test_transpose()";
+
+    Matrix A(ROWS, COLS);
+    A.fillRandom(-50, 50);
+    
+    mainClock = std::clock();
+    A.transpose();
+    record(passMessage, true);
+}
+
 void test_inverse()
 {
     std::string passMessage = "test_inverse()";
@@ -216,6 +228,7 @@ void runTests()
     test_matrix_scalar_multiplication();
     test_matrix_addition();
     test_matrix_subtraction();
+    test_transpose();
     test_inverse();
     // test_determinant(); // DO NOT RUN UNTIL ALGORITHM TAKES ADVANTAGE OF MULTUPLE PROCESSES
     test_adjoint();

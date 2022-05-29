@@ -42,6 +42,7 @@ namespace SimpiNS
             void calculateScalarProduct(double lambda, Matrix* product, int start, int end, bool moreRows);
             void calculateSum(const Matrix &B, Matrix* sum, int start, int end, bool moreRows);
             void calculateDifference(const Matrix &B, Matrix* sum, int start, int end, bool moreRows);
+            void calculateTranspose(Matrix* A_T, int start, int end, bool moreRows);
 
         public:
             static void setSimpi(Simpi *s);
@@ -77,25 +78,22 @@ namespace SimpiNS
             friend std::ostream& operator<<(std::ostream& out, const Matrix& m);
 
             bool equals(Matrix &comparand);
-            friend bool operator==(Matrix &lhs, Matrix &rhs);
-            friend bool operator!=(Matrix &lhs, Matrix &rhs);  
-
+                friend bool operator==(Matrix &lhs, Matrix &rhs);
+                friend bool operator!=(Matrix &lhs, Matrix &rhs);  
             Matrix &multiply(Matrix &operand);
-            friend Matrix &operator*(Matrix &lhs, Matrix &rhs);
-            friend void operator*=(Matrix &lhs, Matrix &rhs);
-            
+                friend Matrix &operator*(Matrix &lhs, Matrix &rhs);
+                friend void operator*=(Matrix &lhs, Matrix &rhs);
             Matrix &scalarMultiply(double operand);
-            friend Matrix &operator*(double lhs, Matrix &rhs);
-            friend Matrix &operator*(Matrix &lhs, double rhs);
-            friend void operator*=(Matrix &lhs, double rhs);
-
+                friend Matrix &operator*(double lhs, Matrix &rhs);
+                friend Matrix &operator*(Matrix &lhs, double rhs);
+                friend void operator*=(Matrix &lhs, double rhs);
             Matrix &add(Matrix &operand);
-            friend Matrix &operator+(Matrix &lhs, Matrix &rhs);
-            friend void operator+=(Matrix &lhs, Matrix &rhs);
-            
+                friend Matrix &operator+(Matrix &lhs, Matrix &rhs);
+                friend void operator+=(Matrix &lhs, Matrix &rhs);
             Matrix &subtract(Matrix &operand);
-            friend Matrix &operator-(Matrix &lhs, Matrix &rhs);
-            friend void operator-=(Matrix &lhs, Matrix &rhs); 
+                friend Matrix &operator-(Matrix &lhs, Matrix &rhs);
+                friend void operator-=(Matrix &lhs, Matrix &rhs); 
+            Matrix &transpose();
     };
 }
 #endif

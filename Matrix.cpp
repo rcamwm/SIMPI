@@ -1228,6 +1228,59 @@ namespace SimpiNS
         }
     }
 
+    Matrix &Matrix::transpose()
+    {
+        Matrix *A_T = new Matrix(cols, rows);
+
+        // Processes divide the rows if there are more rows, and divide the columns if not
+        bool moreRows = rows > cols;
+        int div = (moreRows) ? rows : cols; // Number of lines to divide between processes
+
+        int processCount = mainSimpi->getProcessCount();
+        int processID = mainSimpi->getID();
+
+        if (div <= processCount)
+        {
+            int start = processID;
+            int end = start + 1;
+            if (processID < div)
+                calculateTranspose(A_T, start, end, moreRows);
+        }
+        else 
+        {
+            int work = div / processCount;
+            int start = processID * work;
+            int end = start + work;
+            calculateTranspose(A_T, start, end, moreRows);
+
+            int leftoverWork = div % processCount;
+            if (leftoverWork != 0)
+            {
+                start = (work * processCount) + processID;
+                end = start + 1;
+                if (processID < leftoverWork)
+                    calculateTranspose(A_T, start, end, moreRows);
+            }         
+        }
+        mainSimpi->synch();
+        return *A_T;
+    }
+
+    void Matrix::calculateTranspose(Matrix* A_T, int start, int end, bool moreRows)
+    {
+        // Processes divide the rows if there are more rows, and divide the columns if not
+        int rowStart, rowEnd, colStart, colEnd;
+        if (moreRows) { rowStart = start, rowEnd = end, colStart = 0, colEnd = cols; }
+        else { rowStart = 0, rowEnd = rows, colStart = start, colEnd = end; }
+
+        for (int row = rowStart; row < rowEnd; row++)
+        {
+            for (int col = colStart; col < colEnd; col++)
+            {
+                A_T->getRef(col, row) = getVal(row, col);
+            }
+        }
+    }
 
     std::ostream& operator<<(std::ostream& out, const Matrix& m)
     {
@@ -1246,5 +1299,4 @@ namespace SimpiNS
         }
         return out;
     }
-
 }

@@ -277,6 +277,66 @@ void test_matrix_subtraction()
     Matrix::setEqualityPrecision(0.00f);
 }
 
+void test_matrix_transpose_same_size()
+{
+    std::string passMessage = "test_matrix_transpose_same_size() passes test ";
+    int testNo = 1;
+    double x[] = { 4,  7, 8, 6, 
+                   4,  6, 7, 3, 
+                  10,  2, 3, 8, 
+                   1, 10, 4, 7};
+    Matrix A(4, 4);
+    A.fill(x);
+    
+    double y[] = {4, 4, 10,  1, 
+                  7, 6,  2, 10, 
+                  8, 7,  3,  4, 
+                  6, 3,  8,  7};
+    Matrix A_T(4, 4);
+    A_T.fill(y);
+
+    assertAndPrint(passMessage + std::to_string(testNo++), A.transpose() == A_T);
+}
+
+void test_matrix_transpose_more_rows()
+{
+    std::string passMessage = "test_matrix_transpose_more_rows() passes test ";
+    int testNo = 1;
+    double x[] = { 4,  7,  8, 
+                   6,  4,  6, 
+                   7,  3,  10, 
+                   2,  3,  8, 
+                   1, 10,  4,};
+    Matrix A(5, 3);
+    A.fill(x);
+    
+    double y[] = {4, 6,  7, 2,  1, 
+                  7, 4,  3, 3, 10, 
+                  8, 6, 10, 8,  4};
+    Matrix A_T(3, 5);
+    A_T.fill(y);
+
+    assertAndPrint(passMessage + std::to_string(testNo++), A.transpose() == A_T);
+}
+
+void test_matrix_transpose_more_cols()
+{
+    std::string passMessage = "test_matrix_transpose_more_cols() passes test ";
+    int testNo = 1;
+    double x[] = {4, 7, 8, 6, 
+                  4, 6, 7, 3};
+    Matrix A(2, 4);
+    A.fill(x);
+    
+    double y[] = {4, 4,
+                  7, 6,
+                  8, 7,
+                  6, 3};
+    Matrix A_T(4, 2);
+    A_T.fill(y);
+
+    assertAndPrint(passMessage + std::to_string(testNo++), A.transpose() == A_T);
+}
 
 void test_inverse()
 {
@@ -445,6 +505,9 @@ void runTests()
     test_matrix_scalar_multiplication();
     test_matrix_addition();
     test_matrix_subtraction();
+    test_matrix_transpose_same_size();
+    test_matrix_transpose_more_rows();
+    test_matrix_transpose_more_cols();
     test_inverse();
     test_determinant();
     test_adjoint();
