@@ -134,10 +134,9 @@ void test_inverse()
 
     Matrix A(ROWS, COLS);
     A.fillRandom(-50, 50);
-    Matrix inv(ROWS, COLS);
 
     mainClock = std::clock();
-    A.inverse(inv);
+    A.inverse();
     record(passMessage, true);
 }
 
@@ -162,10 +161,9 @@ void test_adjoint()
    
     Matrix A(ROWS, COLS);
     A.fillRandom(-50, 50);
-    Matrix adj(ROWS, COLS);
 
     mainClock = std::clock();
-    A.adjoint(adj);
+    A.adjoint();
     record(passMessage, true);
 }
 

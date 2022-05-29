@@ -241,49 +241,23 @@ namespace SimpiNS
     /**
      * The adjoint of a square matrix is the transpose of its cofactor matrix.
      * Calling Matrix must have equal row and col count.
-     * 
-     * @param adj a Matrix with the same size as the this Matrix
-     *            that will be overwritten with adjoint matrix
      */
-    void Matrix::adjoint(Matrix &adj)
+    Matrix &Matrix::adjoint()
     {
-        if (!isSquareMatrix() || !adj.isSquareMatrix() || getRows() != adj.getRows()) 
+        Matrix *A = this;
+        if (!A->isSquareMatrix()) 
         {
-            std::cout << "Invalid Matrices: Must be equal sized square matrices" << std::endl;
+            std::cout << "Invalid Matrix: Must be square matrix" << std::endl;
             exit(1);
         }
-        allocateAdjointWork(this->arr, adj.arr, getRows());
+        Matrix *adj = new Matrix(A->rows, A->cols);
+        int indices[4];
+        singleCellWorkDivision(getRows(), indices);
+        calculateAdjoint(this->arr, adj->arr, getRows(), indices[0], indices[1]);
+        calculateAdjoint(this->arr, adj->arr, getRows(), indices[2], indices[3]);
+
         mainSimpi->synch();
-    }
-
-    void Matrix::allocateAdjointWork(double* A, double* adj, int order)
-    {
-        int processCount = mainSimpi->getProcessCount();
-        int processID = mainSimpi->getID();
-
-        if (order <= processCount)
-        {
-            int start = processID;
-            int end = start + 1;
-            if (processID < order)
-                calculateAdjoint(A, adj, order, start, end);
-        }
-        else 
-        {
-            int work = order / processCount;
-            int start = processID * work;
-            int end = start + work;
-            calculateAdjoint(A, adj, order, start, end);
-
-            int leftoverWork = order % processCount;
-            if (leftoverWork != 0)
-            {
-                start = (work * processCount) + processID;
-                end = start + 1;
-                if (processID < leftoverWork)
-                    calculateAdjoint(A, adj, order, start, end);
-            }         
-        }
+        return *adj;
     }
 
     /**
@@ -493,16 +467,15 @@ namespace SimpiNS
      * and where B corresponds to individual columns of an identity Matrix of the same size
      * and where X represents each corresponding column of the inverse Matrix.
      * Calling Matrix must have equal row and col count
-     * 
-     * @param inv Matrix of equal size as the calling Matrix to be overwritten
      */
-    void Matrix::inverse(Matrix &inv) 
+    Matrix &Matrix::inverse() 
     {
-        if (!isSquareMatrix() || !inv.isSquareMatrix() || getRows() != inv.getRows()) 
+        if (!isSquareMatrix()) 
         {
-            std::cout << "Invalid Matrices: Must be equal sized square matrices" << std::endl;
+            std::cout << "Invalid Matrix: Must be square matrix" << std::endl;
             exit(1);
         }
+        Matrix *inv = new Matrix(rows, cols);
 
         //Solve for lower and upper matrices
         Matrix* upper = new Matrix(getRows(), getCols());
@@ -560,7 +533,7 @@ namespace SimpiNS
 
             //Input X column to corresponding columnn in final inverse Matrix
             for (int c = 0; c < getRows(); c++)
-                inv.getRef(c,a) = solutionCol[c];
+                inv->getRef(c,a) = solutionCol[c];
         }
 
         // Calculate and execute which processes take the leftover rows 
@@ -600,14 +573,14 @@ namespace SimpiNS
 
                     //Input X column to corresponding columnn in final inverse Matrix
                     for (int c = 0; c < getRows(); c++) 
-                        inv.getRef(c, a) = solutionCol[c];
+                        inv->getRef(c, a) = solutionCol[c];
                     
                 }
             }
         }  
 
         mainSimpi->synch();
-        return;
+        return *inv;
     }
 
     /*
@@ -871,8 +844,7 @@ namespace SimpiNS
     */
     void Matrix::failSafe(Matrix &x, Matrix &B)
     {
-        Matrix* inv = new Matrix(getRows(), getCols());
-        inverse(*inv);
+        Matrix inv = inverse();
         mainSimpi->synch();
 
         int processCount = mainSimpi->getProcessCount();
@@ -897,7 +869,7 @@ namespace SimpiNS
             sol = 0;
             for(int j = 0; j < vectorSize; j++)
             {
-                sol += (inv->getVal(i, j) * B.getVal(j, 0));
+                sol += (inv.getVal(i, j) * B.getVal(j, 0));
             }
             x.getRef(i, 0) = sol;
         }

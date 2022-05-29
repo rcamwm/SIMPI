@@ -350,9 +350,7 @@ void test_inverse()
                   -6, 7,  10, 3,  3};
     Matrix A(5, 5);
     A.fill(x);
-
-    Matrix inv(5, 5);
-    A.inverse(inv);
+    Matrix inv = A.inverse();
 
     double y[] = {-0.0133363,  0.0174213,  0.0078267,  0.0726889, -0.0337270, 
                    0.1305650,  0.0546668,  0.1280080,  0.0901617, -0.0713501, 
@@ -404,10 +402,7 @@ void test_adjoint()
                   -7, -7,  1,  4, 8,};
     Matrix A(5, 5);
     A.fill(x);
-
-    Matrix adj(5, 5);
-    A.adjoint(adj);
-
+    Matrix adj = A.adjoint();
 
     double y[] = { 21253,   2491,   6943,  -1007, -24857, 
                   -11306,  17404,  -6008,   3262,  -8786, 

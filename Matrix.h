@@ -24,7 +24,6 @@ namespace SimpiNS
 
             // determinate() and adjoint() helper functions
             double calculateDeterminant(double* A, int n, int order);
-            void allocateAdjointWork(double* A, double* adj, int order);
             void calculateAdjoint(double* A, double* adj, int order, int start, int end);
             void calculateMinor(double* currentArray, double* minorArray, int i, int j, int n, int order);
 
@@ -62,9 +61,8 @@ namespace SimpiNS
             void fillRandom(int min, int max);
 
             double determinant();
-            void adjoint(Matrix &adj);
-            
-            void inverse(Matrix &inv);
+            Matrix &adjoint();
+            Matrix &inverse();
             void luDecomposition(Matrix* L, Matrix* U);
             void backwardSubstitution(float* b, float* x);
             void forwardSubstitution(float *b, float* x); 

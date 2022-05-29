@@ -26,8 +26,7 @@ void userDefinedActivity()
     std::cout << A; // Doesn't need to be wrapped in if (processID == 0) statement
     if (processID == 0) { std::cout << std::endl; }
 
-    Matrix inverseA(3,3);
-    A.inverse(inverseA);
+    Matrix inverseA = A.inverse();
     if (processID == 0) { std::cout << "Now printing the inverse of Matrix object A:" << inverseA << std::endl; }
 
     Matrix I = A * inverseA;
