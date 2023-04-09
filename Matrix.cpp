@@ -1148,7 +1148,7 @@ namespace SimpiNS
 
     /**
      * C = A - B
-     * Solves matrix addition in parallel and outputs the product solution.
+     * Solves matrix subtraction in parallel and outputs the product solution.
      * 
      * @param B a Matrix of equal size to this Matrix (A) 
      * @return the Matrix C, the difference between this Matrix (A) and B 
