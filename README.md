@@ -7,10 +7,14 @@ Simple message passing interface in C++ designed for linux.
 To run this program, first clone the repository to a local linux machine and edit the user.cpp file, then:
 
 Compile with:
-`../SIMPI$ make`
+```
+make
+```
 
 Run with:
-`../SIMPI$ ./mpi <program> <n>`
+```
+./mpi <program> <n>
+```
 
 where `<program>` is `user`, `test_cases`, or `test_times`, and `<n>` is the desired number of parallel processes to use.
 
